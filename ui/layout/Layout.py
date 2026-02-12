@@ -4,9 +4,9 @@ from dataclasses import dataclass
 @dataclass
 class Layout:
     game_w: int = 256
-    game_h: int = 192
-    ui_w: int = 160
-    h: int = 192
+    game_h: int = 400
+    ui_w: int = 400
+    h: int = 400
     gutter: int = 1  # separator line thickness
 
     @property

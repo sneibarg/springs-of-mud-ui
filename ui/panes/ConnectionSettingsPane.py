@@ -8,13 +8,14 @@ from net.client.AuthClient import AuthClient
 
 
 class ConnectionSettingsPane:
-    def __init__(self, x: int, y: int, width: int, height: int, message_dialog):
+    def __init__(self, x: int, y: int, width: int, height: int, message_dialog, mud_client_ui=None):
         self.x = x
         self.y = y
         self.width = width
         self.height = height
         self.visible = False
         self.message_dialog = message_dialog
+        self.mud_client_ui = mud_client_ui
         self.connection_name = ""
         self.server_url = "http://localhost:8169"
         self.account_name = ""
@@ -51,12 +52,14 @@ class ConnectionSettingsPane:
         self.selected_connection_idx = None
         self.active_field = None
 
-    def _obfuscate_password(self, password: str) -> str:
+    @staticmethod
+    def _obfuscate_password(password: str) -> str:
         if not password:
             return ""
         return base64.b64encode(password.encode('utf-8')).decode('utf-8')
 
-    def _deobfuscate_password(self, obfuscated: str) -> str:
+    @staticmethod
+    def _deobfuscate_password(obfuscated: str) -> str:
         if not obfuscated:
             return ""
         try:
@@ -64,7 +67,8 @@ class ConnectionSettingsPane:
         except Exception:
             return ""
 
-    def _get_connections_path(self) -> str:
+    @staticmethod
+    def _get_connections_path() -> str:
         resources_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "resources")
         os.makedirs(resources_dir, exist_ok=True)
         return os.path.join(resources_dir, "connections.json")
@@ -112,7 +116,6 @@ class ConnectionSettingsPane:
         self._clear_connection_fields()
 
     def _load_connection(self, idx: int) -> None:
-        """Load a connection from the saved list."""
         if 0 <= idx < len(self.saved_connections):
             conn = self.saved_connections[idx]
             self.connection_name = conn.get("name", "")
@@ -263,6 +266,10 @@ class ConnectionSettingsPane:
 
             self.status_message = f"Connected as {result.accountName}"
             self.status_color = 11
+
+            # Update character list in MudClientUI
+            if self.mud_client_ui and result.playerCharacterList:
+                self.mud_client_ui.update_character_list(result.playerCharacterList)
         except Exception as e:
             error_message = str(e)
             self.message_dialog.show(
@@ -278,7 +285,6 @@ class ConnectionSettingsPane:
 
         list_width = 100
         form_x = self.x + list_width + 5
-
         for y in range(0, pyxel.height, 2):
             for x in range(0, pyxel.width, 2):
                 pyxel.pset(x, y, 0)

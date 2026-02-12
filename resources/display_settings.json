@@ -1,0 +1,10 @@
+{
+  "chars_per_line": 120,
+  "visible_lines": 100,
+  "font_scale": 1,
+  "line_spacing": 6,
+  "window_height": 465,
+  "scroll_buffer": 5000,
+  "game_pane_width": 600,
+  "text_pane_width": 500
+}
