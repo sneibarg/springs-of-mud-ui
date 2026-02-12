@@ -50,8 +50,8 @@ class MudClientUI:
         display_pane_y = max(10, (self.l.h - display_pane_height) // 2)
         self.display_settings = DisplaySettingsPane(pane_x, display_pane_y, pane_width, display_pane_height, self.message_dialog, self)
 
-        self.player_x = self.l.game_w // 2
-        self.player_y = self.l.game_h // 2
+        # self.player_x = self.l.game_w // 2
+        # self.player_y = self.l.game_h // 2
         self.character_list = []
 
         # Display settings - load from display_settings pane
@@ -86,7 +86,15 @@ class MudClientUI:
         if characters:
             self.log(f"Character list updated: {len(characters)} character(s) available.")
 
-    def apply_display_settings(self, chars_per_line: int, visible_lines: int, font_scale: int, line_spacing: int, window_height: int = None, scroll_buffer: int = None, game_pane_width: int = None, text_pane_width: int = None) -> None:
+    def apply_display_settings(self, chars_per_line: int,
+                               visible_lines: int,
+                               font_scale: int,
+                               line_spacing: int,
+                               window_height: int = None,
+                               scroll_buffer: int = None,
+                               game_pane_width: int = None,
+                               text_pane_width: int = None,
+                               font_name: str = None) -> None:
         # Update settings
         self.chars_per_line = chars_per_line
         self.visible_lines = visible_lines
@@ -114,6 +122,9 @@ class MudClientUI:
 
         if text_pane_width:
             self.l.ui_w = text_pane_width
+
+        if font_name:
+            self.text_font_name = font_name
 
         self.log(f"Settings applied: {chars_per_line} chars/line, game_w={game_pane_width}px, text_w={text_pane_width}px")
 
@@ -210,7 +221,7 @@ class MudClientUI:
                 col = 1 if ((x // 8 + y // 8) % 2 == 0) else 2
                 pyxel.rect(x, y, 8, 8, col)
 
-        pyxel.circ(self.player_x, self.player_y + 10, 3, 10)
+        # pyxel.circ(self.player_x, self.player_y + 10, 3, 10)
         # pyxel.text(4, 14, "GAME PANE (WASD demo)", 7)
         pyxel.clip()
 

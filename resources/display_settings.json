@@ -6,5 +6,6 @@
   "window_height": 465,
   "scroll_buffer": 5000,
   "game_pane_width": 600,
-  "text_pane_width": 500
+  "text_pane_width": 500,
+  "font_name": "dos_8x8"
 }
