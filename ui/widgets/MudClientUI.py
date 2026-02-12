@@ -171,17 +171,17 @@ class MudClientUI:
             elif pyxel.mouse_wheel < 0:
                 self.scroll_offset = max(0, self.scroll_offset - 3)
 
-        if pyxel.btn(pyxel.KEY_W):
-            self.player_y -= 1
-        if pyxel.btn(pyxel.KEY_S):
-            self.player_y += 1
-        if pyxel.btn(pyxel.KEY_A):
-            self.player_x -= 1
-        if pyxel.btn(pyxel.KEY_D):
-            self.player_x += 1
+        # if pyxel.btn(pyxel.KEY_W):
+        #     self.player_y -= 1
+        # if pyxel.btn(pyxel.KEY_S):
+        #     self.player_y += 1
+        # if pyxel.btn(pyxel.KEY_A):
+        #     self.player_x -= 1
+        # if pyxel.btn(pyxel.KEY_D):
+        #     self.player_x += 1
 
-        self.player_x = max(0, min(self.l.game_w - 1, self.player_x))
-        self.player_y = max(0, min(self.l.game_h - 1, self.player_y))
+        # self.player_x = max(0, min(self.l.game_w - 1, self.player_x))
+        # self.player_y = max(0, min(self.l.game_h - 1, self.player_y))
 
         cmd = self.input.update()
         if cmd is not None:

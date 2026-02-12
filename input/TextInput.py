@@ -154,7 +154,7 @@ class TextInput:
 
     def _sel_range(self) -> tuple[int, int]:
         assert self.selection_start is not None and self.selection_end is not None
-        return (min(self.selection_start, self.selection_end), max(self.selection_start, self.selection_end))
+        return min(self.selection_start, self.selection_end), max(self.selection_start, self.selection_end)
 
     def selected_text(self) -> str:
         if not self.has_selection():
