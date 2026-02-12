@@ -1,5 +1,5 @@
 from typing import Optional
-from ui.widgets.MenuDropdown import MenuDropdown
+from component.MenuDropdown import MenuDropdown
 
 import pyxel
 

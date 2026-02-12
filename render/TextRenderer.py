@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import pyxel
 
+
 @dataclass(frozen=True)
 class TextPaneMetrics:
     pad: int = 4
@@ -40,25 +41,25 @@ class TextRenderer:
         return list(scrollback)[-max_lines:]
 
     def draw(
-        self,
-        *,
-        x0: int,
-        y0: int,
-        w: int,
-        h: int,
-        title: str,
-        scrollback: deque[str],
-        scroll_offset: int,
-        visible_lines: int,
-        line_spacing: int,
-        font_scale: int,
-        prompt: str,
-        input_buf: str,
-        input_cursor: int,
-        has_selection: bool,
-        selection_start: int | None,
-        selection_end: int | None,
-        blink_on: bool,
+            self,
+            *,
+            x0: int,
+            y0: int,
+            w: int,
+            h: int,
+            title: str,
+            scrollback: deque[str],
+            scroll_offset: int,
+            visible_lines: int,
+            line_spacing: int,
+            font_scale: int,
+            prompt: str,
+            input_buf: str,
+            input_cursor: int,
+            has_selection: bool,
+            selection_start: int | None,
+            selection_end: int | None,
+            blink_on: bool,
     ) -> None:
         m = self.m
 

@@ -4,8 +4,8 @@ import pyxel
 from collections import deque
 from input.TextInput import TextInput
 from ui.layout.Layout import Layout
-from ui.widgets.MenuBar import MenuBar
-from ui.widgets.MessageDialog import MessageDialog
+from component.MenuBar import MenuBar
+from component.MessageDialog import MessageDialog
 from ui.panes.ConnectionSettingsPane import ConnectionSettingsPane
 from ui.panes.DisplaySettingsPane import DisplaySettingsPane
 from render.TextRenderer import TextRenderer
@@ -14,49 +14,41 @@ from render.CursorRenderer import CursorRenderer
 
 class MudClientUI:
     def __init__(self) -> None:
-        # Create layout - will be updated with saved settings
         self.text_font_name = None
-        self.l = Layout()
+        self.layout = Layout()
 
-        # Load display settings to get saved pane widths BEFORE initializing pyxel
         temp_settings = DisplaySettingsPane(0, 0, 100, 100, None, None)
-        self.l.game_w = int(temp_settings.game_pane_width)
-        self.l.ui_w = int(temp_settings.text_pane_width)
-        self.l.h = int(temp_settings.window_height)
-        self.l.game_h = int(temp_settings.window_height)
+        self.layout.game_w = int(temp_settings.game_pane_width)
+        self.layout.ui_w = int(temp_settings.text_pane_width)
+        self.layout.h = int(temp_settings.window_height)
+        self.layout.game_h = int(temp_settings.window_height)
 
-        pyxel.init(self.l.w, self.l.h, title="Pyxel MUD Client (graphics + ui)", fps=60, display_scale=3)
+        pyxel.init(self.layout.w, self.layout.h, title="Pyxel MUD Client (graphics + ui)", fps=60, display_scale=3)
         pyxel.mouse(True)
 
-        # Renderers
         self.text_renderer = TextRenderer()
         self.cursor_renderer = CursorRenderer()
-
-        # Allow very long input - wrapping happens in log display
         self.input = TextInput(max_len=2000)
-        # Temporary scrollback - will be recreated with correct size after loading settings
         self.scrollback: deque[str] = deque(maxlen=500)
 
-        self.menu_bar = MenuBar(x=0, y=0, width=self.l.w, height=10)
+        self.menu_bar = MenuBar(x=0, y=0, width=self.layout.w, height=10)
         settings_menu = self.menu_bar.add_menu("Settings")
         settings_menu.add_item("Connections", self.show_connection_settings)
         settings_menu.add_item("Display", self.show_display_settings)
 
-        pane_width = min(300, self.l.w - 40)
+        pane_width = min(300, self.layout.w - 40)
         pane_height = 180
-        pane_x = (self.l.w - pane_width) // 2
-        pane_y = (self.l.h - pane_height) // 2
+        pane_x = (self.layout.w - pane_width) // 2
+        pane_y = (self.layout.h - pane_height) // 2
 
         self.message_dialog = MessageDialog()
-        self.connection_settings = ConnectionSettingsPane(pane_x, pane_y, pane_width, pane_height, self.message_dialog,
-                                                          self)
+        self.connection_settings = ConnectionSettingsPane(pane_x, pane_y, pane_width, pane_height, self.message_dialog, self)
 
         # Display settings pane needs more height for all fields (now includes pane width settings)
-        display_pane_height = min(380, self.l.h - 20)
-        display_pane_y = max(10, (self.l.h - display_pane_height) // 2)
-        self.display_settings = DisplaySettingsPane(pane_x, display_pane_y, pane_width, display_pane_height,
-                                                    self.message_dialog, self)
+        display_pane_height = min(380, self.layout.h - 20)
+        display_pane_y = max(10, (self.layout.h - display_pane_height) // 2)
 
+        self.display_settings = DisplaySettingsPane(pane_x, display_pane_y, pane_width, display_pane_height, self.message_dialog, self)
         self.character_list = []
 
         # Display settings - load from display_settings pane
@@ -76,7 +68,7 @@ class MudClientUI:
         self.log("Left pane is your render surface; right pane is scrollback + input.")
         self.log(f"Scroll buffer initialized: {self.scrollback.maxlen} lines")
         self.log(f"Text wrapping at: {self.chars_per_line} chars per line")
-        self.log(f"Text pane width: {self.l.ui_w}px (~{self.l.ui_w // 4} chars visible)")
+        self.log(f"Text pane width: {self.layout.ui_w}px (~{self.layout.ui_w // 4} chars visible)")
 
         pyxel.run(self.update, self.draw)
 
@@ -104,20 +96,21 @@ class MudClientUI:
             old_messages = list(self.scrollback)
             self.scrollback = deque(old_messages, maxlen=scroll_buffer)
 
-        if window_height and window_height != self.l.h:
-            self.l.h = window_height
-            self.l.game_h = window_height
+        if window_height and window_height != self.layout.h:
+            self.layout.h = window_height
+            self.layout.game_h = window_height
 
         if game_pane_width:
-            self.l.game_w = game_pane_width
+            self.layout.game_w = game_pane_width
 
         if text_pane_width:
-            self.l.ui_w = text_pane_width
+            self.layout.ui_w = text_pane_width
 
         if font_name:
             self.text_font_name = font_name
 
-        self.log(f"Settings applied: {chars_per_line} chars/line, game_w={game_pane_width}px, text_w={text_pane_width}px")
+        self.log(
+            f"Settings applied: {chars_per_line} chars/line, game_w={game_pane_width}px, text_w={text_pane_width}px")
 
     def log(self, msg: str) -> None:
         chars_per_line = self.chars_per_line
@@ -159,7 +152,7 @@ class MudClientUI:
 
         # Mouse wheel scrolling in text pane
         mx, my = pyxel.mouse_x, pyxel.mouse_y
-        if self.l.ui_x <= mx < self.l.ui_x + self.l.ui_w and 10 <= my < self.l.h:
+        if self.layout.ui_x <= mx < self.layout.ui_x + self.layout.ui_w and 10 <= my < self.layout.h:
             if pyxel.mouse_wheel > 0:
                 self.scroll_offset = min(self.scroll_offset + 3, max(0, len(self.scrollback) - 1))
             elif pyxel.mouse_wheel < 0:
@@ -175,10 +168,10 @@ class MudClientUI:
 
         self.draw_game_pane()
         self.text_renderer.draw(
-            x0=self.l.ui_x,
+            x0=self.layout.ui_x,
             y0=10,
-            w=self.l.ui_w,
-            h=self.l.h - 10,
+            w=self.layout.ui_w,
+            h=self.layout.h - 10,
             title="TEXT / COMMAND",
             scrollback=self.scrollback,
             scroll_offset=self.scroll_offset,
@@ -194,7 +187,7 @@ class MudClientUI:
             blink_on=((pyxel.frame_count // 20) % 2 == 0),
         )
 
-        pyxel.rect(self.l.game_w, 10, self.l.gutter, self.l.h - 10, 5)
+        pyxel.rect(self.layout.game_w, 10, self.layout.gutter, self.layout.h - 10, 5)
 
         self.menu_bar.draw()
         self.connection_settings.draw()
@@ -204,10 +197,10 @@ class MudClientUI:
         self.cursor_renderer.draw()
 
     def draw_game_pane(self) -> None:
-        pyxel.clip(self.l.game_x, 10, self.l.game_w, self.l.game_h - 10)
+        pyxel.clip(self.layout.game_x, 10, self.layout.game_w, self.layout.game_h - 10)
 
-        for y in range(10, self.l.game_h, 8):
-            for x in range(0, self.l.game_w, 8):
+        for y in range(10, self.layout.game_h, 8):
+            for x in range(0, self.layout.game_w, 8):
                 col = 1 if ((x // 8 + y // 8) % 2 == 0) else 2
                 pyxel.rect(x, y, 8, 8, col)
 
