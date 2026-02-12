@@ -23,7 +23,7 @@ class ConnectionSettingsPane:
         self.saved_connections: List[Dict] = []
         self.selected_connection_idx: Optional[int] = None
         self.hovered_connection_idx: Optional[int] = None
-        self.active_field: Optional[str] = None  # "name", "server", "account", "password"
+        self.active_field: Optional[str] = None
         self.cursor_pos = 0
         self.status_message = ""
         self.status_color = 7
@@ -44,7 +44,6 @@ class ConnectionSettingsPane:
         self.visible = not self.visible
 
     def _clear_connection_fields(self) -> None:
-        """Clear all connection fields and deselect."""
         self.connection_name = ""
         self.server_url = "http://localhost:8169"
         self.account_name = ""
@@ -53,13 +52,11 @@ class ConnectionSettingsPane:
         self.active_field = None
 
     def _obfuscate_password(self, password: str) -> str:
-        """Obfuscate password using base64 encoding."""
         if not password:
             return ""
         return base64.b64encode(password.encode('utf-8')).decode('utf-8')
 
     def _deobfuscate_password(self, obfuscated: str) -> str:
-        """Deobfuscate password from base64 encoding."""
         if not obfuscated:
             return ""
         try:
@@ -68,13 +65,11 @@ class ConnectionSettingsPane:
             return ""
 
     def _get_connections_path(self) -> str:
-        """Get the path to the connections file in the resources folder."""
         resources_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "resources")
         os.makedirs(resources_dir, exist_ok=True)
         return os.path.join(resources_dir, "connections.json")
 
     def _load_connections(self) -> None:
-        """Load saved connections from file."""
         try:
             connections_path = self._get_connections_path()
             if os.path.exists(connections_path):
@@ -85,7 +80,6 @@ class ConnectionSettingsPane:
             self.saved_connections = []
 
     def _save_connections(self) -> None:
-        """Save connections to file."""
         try:
             connections_path = self._get_connections_path()
             with open(connections_path, "w") as f:
@@ -95,13 +89,11 @@ class ConnectionSettingsPane:
             self.status_color = 8
 
     def _handle_save_connection(self) -> None:
-        """Save current connection to the list."""
         if not self.connection_name:
             self.status_message = "Please enter a connection name"
             self.status_color = 8
             return
 
-        # Create connection dict with obfuscated password
         connection = {
             "name": self.connection_name,
             "server_url": self.server_url,
@@ -117,8 +109,6 @@ class ConnectionSettingsPane:
         self._save_connections()
         self.status_message = f"Saved '{self.connection_name}'"
         self.status_color = 11
-
-        # Clear fields and deselect to allow creating new connection
         self._clear_connection_fields()
 
     def _load_connection(self, idx: int) -> None:
@@ -128,7 +118,6 @@ class ConnectionSettingsPane:
             self.connection_name = conn.get("name", "")
             self.server_url = conn.get("server_url", "http://localhost:8169")
             self.account_name = conn.get("account_name", "")
-            # Deobfuscate password when loading
             self.password = self._deobfuscate_password(conn.get("password", ""))
             self.selected_connection_idx = idx
             self.status_message = f"Loaded '{self.connection_name}'"
@@ -287,6 +276,9 @@ class ConnectionSettingsPane:
         if not self.visible:
             return
 
+        list_width = 100
+        form_x = self.x + list_width + 5
+
         for y in range(0, pyxel.height, 2):
             for x in range(0, pyxel.width, 2):
                 pyxel.pset(x, y, 0)
@@ -307,6 +299,19 @@ class ConnectionSettingsPane:
             pyxel.text(form_x + 10, self.y + 25, "Connection Name:", 7)
             self._draw_text_field(form_x + 10, self.y + 30, self.width - list_width - 25, 12, self.connection_name,
                                   self.active_field == "name")
+
+            pyxel.text(form_x + 10, self.y + 55, "Server URL:", 7)
+            self._draw_text_field(form_x + 10, self.y + 60, self.width - list_width - 25, 12, self.server_url,
+                                  self.active_field == "server")
+
+            pyxel.text(form_x + 10, self.y + 85, "Account Name:", 7)
+            self._draw_text_field(form_x + 10, self.y + 90, self.width - list_width - 25, 12, self.account_name,
+                                  self.active_field == "account")
+
+            pyxel.text(form_x + 10, self.y + 115, "Password:", 7)
+            display_text = self.password if self.password_visible else "*" * len(self.password)
+            self._draw_text_field(form_x + 10, self.y + 120, self.width - list_width - 145, 12, display_text,
+                                  self.active_field == "password")
 
         def show_password():
             btn_color = 5 if self.toggle_password_hovered else 6
@@ -335,25 +340,9 @@ class ConnectionSettingsPane:
         title()
         close()
 
-        list_width = 100
-        form_x = self.x + list_width + 5
         self._draw_connections_list(list_width)
 
         form_fields()
-
-        pyxel.text(form_x + 10, self.y + 55, "Server URL:", 7)
-        self._draw_text_field(form_x + 10, self.y + 60, self.width - list_width - 25, 12, self.server_url,
-                              self.active_field == "server")
-
-        pyxel.text(form_x + 10, self.y + 85, "Account Name:", 7)
-        self._draw_text_field(form_x + 10, self.y + 90, self.width - list_width - 25, 12, self.account_name,
-                              self.active_field == "account")
-
-        pyxel.text(form_x + 10, self.y + 115, "Password:", 7)
-        display_text = self.password if self.password_visible else "*" * len(self.password)
-        self._draw_text_field(form_x + 10, self.y + 120, self.width - list_width - 145, 12, display_text,
-                              self.active_field == "password")
-
         show_password()
         action_buttons()
 
