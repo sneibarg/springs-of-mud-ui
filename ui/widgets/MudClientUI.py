@@ -1,10 +1,11 @@
+import pyxel
+
 from collections import deque
 from input.TextInput import TextInput
 from ui.layout.Layout import Layout
 from ui.widgets.MenuBar import MenuBar
+from ui.widgets.MessageDialog import MessageDialog
 from ui.panes.ConnectionSettingsPane import ConnectionSettingsPane
-
-import pyxel
 
 
 class MudClientUI:
@@ -24,7 +25,9 @@ class MudClientUI:
         pane_height = 180
         pane_x = (self.l.w - pane_width) // 2
         pane_y = (self.l.h - pane_height) // 2
-        self.connection_settings = ConnectionSettingsPane(pane_x, pane_y, pane_width, pane_height)
+
+        self.message_dialog = MessageDialog()
+        self.connection_settings = ConnectionSettingsPane(pane_x, pane_y, pane_width, pane_height, self.message_dialog)
 
         self.player_x = self.l.game_w // 2
         self.player_y = self.l.game_h // 2
@@ -32,13 +35,13 @@ class MudClientUI:
         self.log("Connected (demo). Type 'help' and press Enter.")
         self.log("Left pane is your render surface; right pane is scrollback + input.")
 
-        pyxel.run(self.update, self.draw)  # :contentReference[oaicite:2]{index=2}
+        pyxel.run(self.update, self.draw)
 
     def show_connection_settings(self) -> None:
         self.connection_settings.show()
 
     def log(self, msg: str) -> None:
-        chars_per_line = max(10, (self.l.ui_w - 8) // 4)  # Pyxel font is small; 4px/char is a decent heuristic
+        chars_per_line = max(10, (self.l.ui_w - 8) // 4)
         for line in msg.splitlines() or [""]:
             while len(line) > chars_per_line:
                 self.scrollback.append(line[:chars_per_line])
@@ -50,21 +53,22 @@ class MudClientUI:
         self.log(f"> {cmd}")
 
         if cmd == "help":
-            self.log("Commands: help, look, say <msg>, move <n/s/e/w>")
-        elif cmd == "look":
-            self.log("You are in a featureless demo room. (Hook this to your MUD world state.)")
-        elif cmd.startswith("say "):
-            self.log(f'You say, "{cmd[4:]}"')
-        elif cmd.startswith("move "):
-            self.log(f"You attempt to move {cmd[5:]}. (Wire to server; update left-pane camera.)")
+            self.log("Commands: help, list, logon, disconnect")
+        elif cmd == "logon":
+            self.log("You must pass a valid player character name to the logon command.")
+        elif cmd == "list":
+            pass
+        elif cmd.split()[1].isalpha():
+            self.log(f"Logging you onto the server as your existing player character {cmd.split()[1]}...")
         else:
             self.log("Unknown command. Type 'help'.")
 
     def update(self) -> None:
         self.menu_bar.update()
+        self.message_dialog.update()
         self.connection_settings.update()
 
-        if self.connection_settings.visible:
+        if self.connection_settings.visible or self.message_dialog.visible:
             return
 
         if pyxel.btn(pyxel.KEY_W):
@@ -91,13 +95,9 @@ class MudClientUI:
 
         pyxel.rect(self.l.game_w, 10, self.l.gutter, self.l.h - 10, 5)
 
-        # Draw menu bar on top of game panes
         self.menu_bar.draw()
-
-        # Draw connection settings on top of everything
         self.connection_settings.draw()
-
-        # Draw custom cursor last
+        self.message_dialog.draw()
         self.draw_custom_cursor()
 
     def draw_game_pane(self) -> None:
@@ -145,22 +145,27 @@ class MudClientUI:
 
         pyxel.clip()
 
-    def draw_custom_cursor(self) -> None:
+    @staticmethod
+    def draw_custom_cursor() -> None:
         mx, my = pyxel.mouse_x, pyxel.mouse_y
 
-        # Simple larger arrow cursor with outline
-        # Outline
-        pyxel.line(mx - 1, my, mx - 1, my + 9, 0)
-        pyxel.line(mx + 1, my, mx + 1, my + 9, 0)
-        pyxel.line(mx, my - 1, mx + 6, my + 5, 0)
-        pyxel.line(mx, my + 1, mx + 6, my + 7, 0)
-        pyxel.line(mx, my + 9, mx + 4, my + 7, 0)
+        def outline() -> None:
+            pyxel.line(mx - 1, my, mx - 1, my + 9, 0)
+            pyxel.line(mx + 1, my, mx + 1, my + 9, 0)
+            pyxel.line(mx, my - 1, mx + 6, my + 5, 0)
+            pyxel.line(mx, my + 1, mx + 6, my + 7, 0)
+            pyxel.line(mx, my + 9, mx + 4, my + 7, 0)
 
-        # Main cursor
-        pyxel.line(mx, my, mx, my + 8, 7)
-        pyxel.line(mx, my, mx + 5, my + 5, 7)
-        pyxel.line(mx, my + 8, mx + 3, my + 6, 7)
+        def main() -> None:
+            pyxel.rect(mx - 1, my, 3, 9, 7)
+            pyxel.line(mx, my, mx, my + 8, 7)
+            pyxel.line(mx, my, mx + 5, my + 5, 7)
+            pyxel.line(mx, my + 8, mx + 3, my + 6, 7)
 
-        # Fill
-        pyxel.line(mx + 1, my + 3, mx + 3, my + 5, 10)
-        pyxel.line(mx + 1, my + 4, mx + 2, my + 5, 10)
+        def fill() -> None:
+            pyxel.line(mx + 1, my + 3, mx + 3, my + 5, 10)
+            pyxel.line(mx + 1, my + 4, mx + 2, my + 5, 10)
+
+        outline()
+        main()
+        fill()
