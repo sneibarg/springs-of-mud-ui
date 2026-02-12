@@ -2,10 +2,10 @@ import json
 import os
 import pyxel
 
-from component.Button import Button
+from component.button.Button import Button
 from component.UIDropdown import UIDropdown
 from component.NumberField import NumberField
-from component.Rect import Rect
+from component.geometry.Rect import Rect
 
 
 class DisplaySettingsPane:

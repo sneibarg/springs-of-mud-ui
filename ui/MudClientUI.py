@@ -4,7 +4,7 @@ import pyxel
 from collections import deque
 from input.TextInput import TextInput
 from ui.layout.Layout import Layout
-from component.MenuBar import MenuBar
+from component.menu.MenuBar import MenuBar
 from component.MessageDialog import MessageDialog
 from ui.panes.ConnectionSettingsPane import ConnectionSettingsPane
 from ui.panes.DisplaySettingsPane import DisplaySettingsPane

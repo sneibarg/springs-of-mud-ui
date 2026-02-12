@@ -1,5 +1,5 @@
 from typing import Callable
-from component.Rect import Rect
+from component.geometry.Rect import Rect
 
 import pyxel
 

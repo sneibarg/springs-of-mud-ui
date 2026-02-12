@@ -1,5 +1,5 @@
 from typing import Optional, Callable
-from component.MenuItem import MenuItem
+from component.menu.MenuItem import MenuItem
 
 
 class MenuDropdown:

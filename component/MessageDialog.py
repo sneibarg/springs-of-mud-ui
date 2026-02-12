@@ -1,32 +1,56 @@
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Callable, Optional
+from component.button.Button import Button
+from component.geometry.Rect import Rect
+
 import pyxel
 
-from typing import Optional, Callable
+
+@dataclass(frozen=True)
+class DialogStyle:
+    panel_fill: int = 1
+    panel_border: int = 8
+    title_fill: int = 8
+    title_text: int = 7
+    body_text: int = 7
+    overlay_color: int = 0  # used by pset stipple
+    ok_base: int = 3
+    ok_hover: int = 11
 
 
 class MessageDialog:
-    def __init__(self):
+    def __init__(self, width: int = 200, height: int = 100, style: DialogStyle | None = None):
         self.visible = False
         self.title = ""
         self.message = ""
-        self.x = 0
-        self.y = 0
-        self.width = 200
-        self.height = 100
-        self.ok_button_hovered = False
-        self.on_close: Optional[Callable] = None
+        self.width = width
+        self.height = height
+        self.on_close: Optional[Callable[[], None]] = None
+        self.style = style or DialogStyle()
+        self.rect = Rect(0, 0, self.width, self.height)
+        self.ok_button: Optional[Button] = None
 
-    def show(self, title: str, message: str, on_close: Optional[Callable] = None) -> None:
+    def show(self, title: str, message: str, on_close: Optional[Callable[[], None]] = None) -> None:
         self.title = title
         self.message = message
         self.visible = True
         self.on_close = on_close
 
-        self.x = (pyxel.width - self.width) // 2  # Center the dialog
-        self.y = (pyxel.height - self.height) // 2
+        x = (pyxel.width - self.width) // 2
+        y = (pyxel.height - self.height) // 2
+        self.rect = Rect(x, y, self.width, self.height)
+
+        ok_w, ok_h = 40, 15
+        ok_x = x + self.width // 2 - ok_w // 2
+        ok_y = y + self.height - 25
+
+        self.ok_button = Button(rect=Rect(ok_x, ok_y, ok_w, ok_h), text="OK", base_col=self.style.ok_base, hover_col=self.style.ok_hover,on_click=self.hide)
 
     def hide(self) -> None:
+        was_visible = self.visible
         self.visible = False
-        if self.on_close:
+        if was_visible and self.on_close:
             self.on_close()
 
     def update(self) -> None:
@@ -34,69 +58,73 @@ class MessageDialog:
             return
 
         mx, my = pyxel.mouse_x, pyxel.mouse_y
-        ok_button_x = self.x + self.width // 2 - 20
-        ok_button_y = self.y + self.height - 25
+        click = pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT)
 
-        if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
-            if ok_button_x <= mx < ok_button_x + 40 and ok_button_y <= my < ok_button_y + 15:
-                self.hide()
+        if self.ok_button:
+            self.ok_button.update(mx, my, click)
 
-        self.ok_button_hovered = (ok_button_x <= mx < ok_button_x + 40 and ok_button_y <= my < ok_button_y + 15)
-        if pyxel.btnp(pyxel.KEY_RETURN):
+        if pyxel.btnp(pyxel.KEY_RETURN) or pyxel.btnp(pyxel.KEY_KP_ENTER):
             self.hide()
 
     def draw(self) -> None:
         if not self.visible:
             return
 
+        self._draw_overlay()
+        self._draw_panel()
+        self._draw_title_bar()
+        self._draw_message_body()
+
+        if self.ok_button:
+            self.ok_button.draw()
+
+    @staticmethod
+    def _draw_overlay() -> None:
         for y in range(0, pyxel.height, 2):
             for x in range(0, pyxel.width, 2):
                 pyxel.pset(x, y, 0)
 
-        def dialogue_background():
-            pyxel.rect(self.x, self.y, self.width, self.height, 1)
-            pyxel.rectb(self.x, self.y, self.width, self.height, 8)
+    def _draw_panel(self) -> None:
+        s = self.style
+        r = self.rect
+        pyxel.rect(r.x, r.y, r.w, r.h, s.panel_fill)
+        pyxel.rectb(r.x, r.y, r.w, r.h, s.panel_border)
 
-        def title_bar():
-            pyxel.rect(self.x, self.y, self.width, 15, 8)
-            title_x = self.x + (self.width - len(self.title) * 4) // 2
-            pyxel.text(title_x, self.y + 5, self.title, 7)
+    def _draw_title_bar(self) -> None:
+        s = self.style
+        r = self.rect
+        pyxel.rect(r.x, r.y, r.w, 15, s.title_fill)
+        title_x = r.x + (r.w - len(self.title) * 4) // 2
+        pyxel.text(title_x, r.y + 5, self.title, s.title_text)
 
-        dialogue_background()
-        title_bar()
+    def _draw_message_body(self) -> None:
+        s = self.style
+        r = self.rect
 
-        self._draw_wrapped_text()
+        lines = self._wrap_text(self.message, max_chars=(r.w - 20) // 4)
+        text_y = r.y + 25
+        for line in lines[:5]:
+            pyxel.text(r.x + 10, text_y, line, s.body_text)
+            text_y += 8
 
-        ok_button_x = self.x + self.width // 2 - 20
-        ok_button_y = self.y + self.height - 25
+    @staticmethod
+    def _wrap_text(text: str, max_chars: int) -> list[str]:
+        if not text:
+            return [""]
 
-        btn_color = 11 if self.ok_button_hovered else 3
-        pyxel.rect(ok_button_x, ok_button_y, 40, 15, btn_color)
-        pyxel.rectb(ok_button_x, ok_button_y, 40, 15, 7)
-        pyxel.text(ok_button_x + 14, ok_button_y + 5, "OK", 7)
-
-    def _draw_wrapped_text(self) -> None:
-        def draw_lines():
-            text_y = self.y + 25
-            for line in lines[:5]:
-                pyxel.text(self.x + 10, text_y, line, 7)
-                text_y += 8
-
-        max_chars_per_line = (self.width - 20) // 4
-        words = self.message.split()
-        lines = []
-        current_line = ""
-
-        for word in words:
-            test_line = current_line + (" " if current_line else "") + word
-            if len(test_line) <= max_chars_per_line:
-                current_line = test_line
+        words = text.split()
+        lines: list[str] = []
+        cur = ""
+        for w in words:
+            test = f"{cur} {w}".strip()
+            if len(test) <= max_chars:
+                cur = test
             else:
-                if current_line:
-                    lines.append(current_line)
-                current_line = word
+                if cur:
+                    lines.append(cur)
+                cur = w
 
-        if current_line:
-            lines.append(current_line)
+        if cur:
+            lines.append(cur)
 
-        draw_lines()
+        return lines

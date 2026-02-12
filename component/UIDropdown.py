@@ -1,7 +1,7 @@
 import pyxel
 
 from typing import List, Optional
-from component.Rect import Rect
+from component.geometry.Rect import Rect
 
 
 class UIDropdown:

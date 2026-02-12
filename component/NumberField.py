@@ -1,13 +1,9 @@
 import pyxel
 
-from component.Rect import Rect
+from component.geometry.Rect import Rect
 
 
 class NumberField:
-    """
-    Simple numeric field: click-to-focus, type digits, arrows move cursor, backspace/delete.
-    Value stored as string (like your current code), validated to min/max.
-    """
     def __init__(self, rect: Rect, value: str, min_val: int, max_val: int):
         self.rect = rect
         self.value = value
@@ -67,13 +63,11 @@ class NumberField:
         pyxel.rect(self.rect.x, self.rect.y, self.rect.w, self.rect.h, 0)
         pyxel.rectb(self.rect.x, self.rect.y, self.rect.w, self.rect.h, 11 if self.active else 5)
 
-        # fit tail
         max_chars = max(1, (self.rect.w - 8) // 4)
         txt = self.value[-max_chars:] if len(self.value) > max_chars else self.value
         pyxel.text(self.rect.x + 4, self.rect.y + 3, txt, 7)
 
         if self.active and (pyxel.frame_count // 20) % 2 == 0:
-            # cursor within visible tail
             visible_start = max(0, len(self.value) - max_chars)
             c = max(0, self.cursor - visible_start)
             cx = self.rect.x + 4 + c * 4
