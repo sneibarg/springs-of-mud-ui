@@ -1,5 +1,9 @@
+from __future__ import annotations
 from typing import Optional
+from component.geometry.Rect import Rect
+from component.field.TextField import TextField, TextStyle
 from component.menu.MenuDropdown import MenuDropdown
+from component.menu.MenuList import MenuList
 
 import pyxel
 
@@ -13,88 +17,108 @@ class MenuBar:
         self.menus: list[MenuDropdown] = []
         self.active_menu: Optional[MenuDropdown] = None
         self.hovered_item_idx: Optional[int] = None
+        self.text = TextField(TextStyle(col=7, char_w=4, scale=1))
+        self.renderer = MenuList(self.text)
 
     def add_menu(self, label: str) -> MenuDropdown:
         menu = MenuDropdown(label)
         if self.menus:
-            last_menu = self.menus[-1]
-            menu.x = last_menu.x + last_menu.width + 4
+            last = self.menus[-1]
+            menu.x = last.x + last.width + 4
         else:
             menu.x = self.x + 2
 
         menu.y = self.y + self.height
-        menu.width = len(label) * 4 + 8
+        menu.width = self.renderer.label_width(label)
+
         self.menus.append(menu)
         return menu
 
     def update(self) -> None:
         mx, my = pyxel.mouse_x, pyxel.mouse_y
+        click = pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT)
 
-        if pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT):
-            # Check menu labels
-            if self.y <= my < self.y + self.height:
-                for menu in self.menus:
-                    label_width = len(menu.label) * 4 + 8
-                    if menu.x <= mx < menu.x + label_width:
-                        # Toggle menu
-                        if self.active_menu == menu:
-                            self.active_menu = None
-                        else:
-                            self.active_menu = menu
-                            menu.is_open = True
-                        return
-
-            if self.active_menu:
-                item_y = self.active_menu.y + 1
-                max_width = max(len(item.label) * 4 + 8 for item in self.active_menu.items)
-
-                for idx, item in enumerate(self.active_menu.items):
-                    if (self.active_menu.x <= mx < self.active_menu.x + max_width and
-                        item_y <= my < item_y + 10):
-                        if item.action:
-                            item.action()
-                        self.active_menu = None
-                        return
-                    item_y += 10
-
-            # Click outside - close menu
-            self.active_menu = None
-
-        # Track hover for highlighting
-        if self.active_menu:
-            item_y = self.active_menu.y + 1
-            max_width = max(len(item.label) * 4 + 8 for item in self.active_menu.items)
-            self.hovered_item_idx = None
-
-            for idx, item in enumerate(self.active_menu.items):
-                if (self.active_menu.x <= mx < self.active_menu.x + max_width and
-                    item_y <= my < item_y + 10):
-                    self.hovered_item_idx = idx
-                    break
-                item_y += 10
+        if click:
+            if self._click_bar(mx, my):
+                return
+            if self._click_dropdown(mx, my):
+                return
+            self._close_all()
+        else:
+            self._update_hover(mx, my)
 
     def draw(self) -> None:
-        pyxel.rect(self.x, self.y, self.width, self.height, 1)
+        bar = Rect(self.x, self.y, self.width, self.height)
+        self.renderer.draw_bar(bar=bar)
 
         for menu in self.menus:
-            label_width = len(menu.label) * 4 + 8
-            if self.active_menu == menu:
-                pyxel.rect(menu.x, self.y, label_width, self.height, 5)
-            pyxel.text(menu.x + 4, self.y + 2, menu.label, 7)
+            self.renderer.draw_label(menu=menu, bar_y=self.y, bar_h=self.height, active=(self.active_menu == menu))
 
-        if self.active_menu:
-            self._draw_dropdown(self.active_menu)
+        if self.active_menu and self.active_menu.is_open:
+            self.renderer.draw_dropdown(menu=self.active_menu, hovered_idx=self.hovered_item_idx)
 
-    def _draw_dropdown(self, menu: MenuDropdown) -> None:
-        max_width = max(len(item.label) * 4 + 8 for item in menu.items)
-        dropdown_height = menu.get_height()
+    def _bar_rect(self) -> Rect:
+        return Rect(self.x, self.y, self.width, self.height)
 
-        pyxel.rect(menu.x, menu.y, max_width, dropdown_height, 1)
-        pyxel.rectb(menu.x, menu.y, max_width, dropdown_height, 5)
+    def _label_rect(self, menu: MenuDropdown) -> Rect:
+        return Rect(menu.x, self.y, self.renderer.label_width(menu.label), self.height)
 
-        item_y = menu.y + 1
-        for idx, item in enumerate(menu.items):
-            if self.hovered_item_idx == idx:
-                pyxel.rect(menu.x + 1, item_y, max_width - 2, 9, 5)
-            pyxel.text(menu.x + 4, item_y + 2, item.label, 7)
-            item_y += 10
+    def _click_bar(self, mx: int, my: int) -> bool:
+        if not self._bar_rect().contains(mx, my):
+            return False
+
+        for menu in self.menus:
+            if self._label_rect(menu).contains(mx, my):
+                self._toggle(menu)
+                return True
+
+        self._close_all()
+        return True
+
+    def _click_dropdown(self, mx: int, my: int) -> bool:
+        if not (self.active_menu and self.active_menu.is_open):
+            return False
+
+        dd = self.renderer.dropdown_rect(self.active_menu)
+        if not dd.contains(mx, my):
+            return False
+
+        idx = (my - dd.y) // self.renderer.m.item_h
+        if 0 <= idx < len(self.active_menu.items):
+            item = self.active_menu.items[idx]
+            self._close_all()
+            if item.action:
+                item.action()
+        else:
+            self._close_all()
+
+        return True
+
+    def _update_hover(self, mx: int, my: int) -> None:
+        self.hovered_item_idx = None
+        if not (self.active_menu and self.active_menu.is_open):
+            return
+
+        dd = self.renderer.dropdown_rect(self.active_menu)
+        if not dd.contains(mx, my):
+            return
+
+        idx = (my - dd.y) // self.renderer.m.item_h
+        if 0 <= idx < len(self.active_menu.items):
+            self.hovered_item_idx = idx
+
+    def _toggle(self, menu: MenuDropdown) -> None:
+        if self.active_menu == menu and menu.is_open:
+            self._close_all()
+            return
+
+        self._close_all()
+        self.active_menu = menu
+        menu.is_open = True
+        self.hovered_item_idx = None
+
+    def _close_all(self) -> None:
+        for m in self.menus:
+            m.is_open = False
+        self.active_menu = None
+        self.hovered_item_idx = None

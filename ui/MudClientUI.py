@@ -2,7 +2,7 @@ import time
 import pyxel
 
 from collections import deque
-from input.TextInput import TextInput
+from component.input.TextInput import TextInput
 from ui.layout.Layout import Layout
 from component.menu.MenuBar import MenuBar
 from component.MessageDialog import MessageDialog
@@ -65,7 +65,7 @@ class MudClientUI:
         self.scroll_offset = 0  # 0 = bottom (most recent), positive = scrolled up
 
         self.log("Connected. Type 'help' and press Enter.")
-        self.log("Left pane is your render surface; right pane is scrollback + input.")
+        self.log("Left pane is your render surface; right pane is scrollback + clipboard.")
         self.log(f"Scroll buffer initialized: {self.scrollback.maxlen} lines")
         self.log(f"Text wrapping at: {self.chars_per_line} chars per line")
         self.log(f"Text pane width: {self.layout.ui_w}px (~{self.layout.ui_w // 4} chars visible)")
@@ -144,13 +144,16 @@ class MudClientUI:
     def update(self) -> None:
         self.menu_bar.update()
         self.message_dialog.update()
-        self.connection_settings.update()
+
+        mx, my = pyxel.mouse_x, pyxel.mouse_y
+        click = pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT)
+        self.connection_settings.update(mx, my, click)
+
         self.display_settings.update()
 
         if self.connection_settings.visible or self.message_dialog.visible or self.display_settings.visible:
             return
 
-        # Mouse wheel scrolling in text pane
         mx, my = pyxel.mouse_x, pyxel.mouse_y
         if self.layout.ui_x <= mx < self.layout.ui_x + self.layout.ui_w and 10 <= my < self.layout.h:
             if pyxel.mouse_wheel > 0:

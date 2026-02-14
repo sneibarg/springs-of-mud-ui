@@ -1,7 +1,8 @@
 from __future__ import annotations
-from component.geometry.Rect import Rect
 from collections import deque
 from dataclasses import dataclass
+from component.geometry.Rect import Rect
+from component.field.TextField import TextField, TextStyle
 
 import pyxel
 
@@ -13,53 +14,70 @@ class TextPaneMetrics:
     header_y: int = 10
     scroll_y0: int = 20
     input_h: int = 16
-    char_w: int = 4  # Pyxel text is effectively 4px wide per char
+    char_w: int = 4  # keep consistent with TextStyle.char_w
+
+
+@dataclass(frozen=True)
+class _ScrollLayout:
+    y0: int
+    h: int
+    line_h: int
+    max_lines: int
 
 
 class TextRenderer:
-    def __init__(self, metrics: TextPaneMetrics | None = None):
+    """
+    Renders the right text pane:
+      - background + header
+      - scrollback (with vertical scroll_offset)
+      - clipboard box (prompt + selection + caret)
+    """
+
+    def __init__(self, *, metrics: TextPaneMetrics | None = None, text_field: TextField | None = None):
         self.m = metrics or TextPaneMetrics()
+        self.t = text_field or TextField(TextStyle(char_w=self.m.char_w))
 
     def draw(self, *, x0: int, y0: int, w: int, h: int, title: str, scrollback: deque[str], scroll_offset: int,
              visible_lines: int, line_spacing: int, font_scale: int, prompt: str, input_buf: str, input_cursor: int,
              has_selection: bool, selection_start: int | None, selection_end: int | None, blink_on: bool) -> None:
         pane = Rect(x0, y0, w, h)
-        pane.clip_begin()
+        self._clip_begin(pane)
         try:
-            self._draw_pane_background(pane)
-            self._draw_header(x0=x0, y0=y0, w=w, title=title)
+            self._draw_pane(pane)
+            self._draw_header(pane, title)
 
-            scroll_y0, scroll_h, line_h, max_lines = self._compute_scrollback_layout(y0=y0, h=h, visible_lines=visible_lines, line_spacing=line_spacing            )
-            lines = self._slice_scrollback(scrollback, max_lines, scroll_offset)
+            scroll_layout = self._scroll_layout(pane, visible_lines, line_spacing)
+            lines = self._slice_scrollback(scrollback, scroll_layout.max_lines, scroll_offset)
+            self._draw_scrollback(pane, scroll_layout, lines, font_scale)
 
-            self._draw_scrollback_text(x0=x0, y_start=scroll_y0, scroll_h=scroll_h, line_h=line_h, lines=lines, font_scale=font_scale)
-
-            input_rect = self._draw_input_box(x0=x0, y0=y0, w=w, h=h)
-            view_start, visible_text = self._compute_input_view(w=w, prompt=prompt, input_buf=input_buf, input_cursor=input_cursor)
-
-            self._draw_prompt(x0=x0, y=input_rect.y, prompt=prompt)
-            self._draw_selection(x0=x0, y=input_rect.y, prompt=prompt, view_start=view_start, visible_text=visible_text,
-                                 has_selection=has_selection, selection_start=selection_start, selection_end=selection_end)
-            self._draw_input_text(x0=x0, y=input_rect.y, prompt=prompt, visible_text=visible_text)
-            self._draw_caret(x0=x0, y=input_rect.y, prompt=prompt, view_start=view_start, input_cursor=input_cursor,blink_on=blink_on)
+            input_rect = self._input_rect(pane)
+            self._draw_input(input_rect, prompt, input_buf, input_cursor, has_selection, selection_start, selection_end, blink_on)
         finally:
-            pane.clip_end()
+            self._clip_end()
 
     @staticmethod
-    def _draw_pane_background(pane: Rect) -> None:
+    def _clip_begin(r: Rect) -> None:
+        pyxel.clip(r.x, r.y, r.w, r.h)
+
+    @staticmethod
+    def _clip_end() -> None:
+        pyxel.clip()
+
+    @staticmethod
+    def _draw_pane(pane: Rect) -> None:
         pane.fill(0)
 
-    def _draw_header(self, *, x0: int, y0: int, w: int, title: str) -> None:
-        Rect(x0, y0, w, self.m.header_h).fill(1)
-        pyxel.text(x0 + self.m.pad, y0 + 2, title, 7)
+    def _draw_header(self, pane: Rect, title: str) -> None:
+        header = Rect(pane.x, pane.y, pane.w, self.m.header_h)
+        header.fill(1)
+        self.t.draw_text(x=pane.x + self.m.pad, y=pane.y + 2, text=title, col=7)
 
-    def _compute_scrollback_layout(self, *, y0: int, h: int, visible_lines: int, line_spacing: int) -> tuple[int, int, int, int]:
-        m = self.m
-        scroll_y0 = y0 + (m.scroll_y0 - m.header_y)
-        scroll_h = h - (scroll_y0 - y0) - m.input_h
+    def _scroll_layout(self, pane: Rect, visible_lines: int, line_spacing: int) -> _ScrollLayout:
+        scroll_y0 = pane.y + (self.m.scroll_y0 - self.m.header_y)
+        scroll_h = pane.h - (scroll_y0 - pane.y) - self.m.input_h
         line_h = max(1, line_spacing)
         max_lines = min(visible_lines, max(1, scroll_h // line_h))
-        return scroll_y0, scroll_h, line_h, max_lines
+        return _ScrollLayout(scroll_y0, scroll_h, line_h, max_lines)
 
     @staticmethod
     def _slice_scrollback(scrollback: deque[str], max_lines: int, scroll_offset: int) -> list[str]:
@@ -74,77 +92,21 @@ class TextRenderer:
 
         return list(scrollback)[-max_lines:]
 
-    def _draw_scrollback_text(self, *, x0: int, y_start: int, scroll_h: int, line_h: int, lines: list[str], font_scale: int) -> None:
-        y = y_start + (scroll_h - len(lines) * line_h)
-        if font_scale > 1:
-            self._draw_scaled_lines(x=x0 + self.m.pad, y=y, lines=lines, line_h=line_h, scale=font_scale)
-        else:
-            self._draw_lines(x=x0 + self.m.pad, y=y, lines=lines, line_h=line_h)
+    def _draw_scrollback(self, pane: Rect, layout: _ScrollLayout, lines: list[str], font_scale: int) -> None:
+        y_start = layout.y0 + (layout.h - len(lines) * layout.line_h)
+        self.t.draw_lines(x=pane.x + self.m.pad, y=y_start, lines=lines, line_h=layout.line_h, col=7, scale=max(1, int(font_scale)))
+
+    def _input_rect(self, pane: Rect) -> Rect:
+        return Rect(pane.x, pane.y + pane.h - self.m.input_h, pane.w, self.m.input_h)
+
+    def _draw_input(self,
+        input_rect: Rect, prompt: str, input_buf: str, input_cursor: int, has_selection: bool, selection_start: int | None, selection_end: int | None, blink_on: bool) -> None:
+        self._draw_input_box(input_rect)
+        self.t.draw_input(rect=input_rect, pad=self.m.pad, prompt=prompt, input_buf=input_buf, input_cursor=input_cursor,
+                          blink_on=blink_on, has_selection=has_selection, selection_start=selection_start, selection_end=selection_end,
+                          prompt_col=7, text_col=7, selection_col=12, caret_col=7)
 
     @staticmethod
-    def _draw_lines(*, x: int, y: int, lines: list[str], line_h: int) -> None:
-        yy = y
-        for line in lines:
-            pyxel.text(x, yy, line, 7)
-            yy += line_h
-
-    @staticmethod
-    def _draw_scaled_lines(*, x: int, y: int, lines: list[str], line_h: int, scale: int) -> None:
-        yy = y
-        for line in lines:
-            for dx in range(scale):
-                for dy in range(scale):
-                    pyxel.text(x + dx, yy + dy, line, 7)
-            yy += line_h * scale
-
-    def _draw_input_box(self, *, x0: int, y0: int, w: int, h: int) -> Rect:
-        box_y = y0 + h - self.m.input_h
-        r = Rect(x0, box_y, w, self.m.input_h)
+    def _draw_input_box(r: Rect) -> None:
         r.fill(1)
-        Rect(x0 + 1, box_y + 1, w - 2, self.m.input_h - 2).border(5)
-        return r
-
-    def _compute_input_view(self, *, w: int, prompt: str, input_buf: str, input_cursor: int) -> tuple[int, str]:
-        m = self.m
-        prompt_w_px = len(prompt) * m.char_w
-        input_box_w_px = w - (m.pad * 2) - prompt_w_px
-        max_visible_chars = max(1, input_box_w_px // m.char_w)
-
-        view_start = 0 if input_cursor < max_visible_chars else (input_cursor - max_visible_chars + 1)
-        visible_text = input_buf[view_start:view_start + max_visible_chars]
-        return view_start, visible_text
-
-    def _draw_prompt(self, *, x0: int, y: int, prompt: str) -> None:
-        pyxel.text(x0 + self.m.pad, y + 5, prompt, 7)
-
-    def _draw_input_text(self, *, x0: int, y: int, prompt: str, visible_text: str) -> None:
-        px = x0 + self.m.pad + len(prompt) * self.m.char_w
-        pyxel.text(px, y + 5, visible_text, 7)
-
-    def _draw_selection(self, *, x0: int, y: int, prompt: str, view_start: int, visible_text: str, has_selection: bool,
-                        selection_start: int | None, selection_end: int | None) -> None:
-        if not has_selection or selection_start is None or selection_end is None:
-            return
-
-        sel_start = min(selection_start, selection_end)
-        sel_end = max(selection_start, selection_end)
-
-        visible_sel_start = max(0, sel_start - view_start)
-        visible_sel_end = min(len(visible_text), sel_end - view_start)
-
-        if visible_sel_start >= len(visible_text) or visible_sel_end <= 0:
-            return
-
-        prompt_w_px = len(prompt) * self.m.char_w
-        sel_x = x0 + self.m.pad + prompt_w_px + visible_sel_start * self.m.char_w
-        sel_w = (visible_sel_end - visible_sel_start) * self.m.char_w
-        Rect(sel_x, y + 5, sel_w, 5).fill(12)
-
-    def _draw_caret(self, *, x0: int, y: int, prompt: str, view_start: int, input_cursor: int, blink_on: bool) -> None:
-        if not blink_on:
-            return
-
-        prompt_w_px = len(prompt) * self.m.char_w
-        visible_cursor = input_cursor - view_start
-        cursor_x = x0 + self.m.pad + prompt_w_px + visible_cursor * self.m.char_w
-        Rect(cursor_x, y + 12, 3, 1).fill(7)
+        Rect(r.x + 1, r.y + 1, r.w - 2, r.h - 2).border(5)

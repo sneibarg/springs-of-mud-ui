@@ -1,6 +1,6 @@
 from typing import Protocol, Optional
-from input.TkClipboard import TkClipboard
-from input.PyperClipboard import PyperclipClipboard
+from clipboard.TkClipboard import TkClipboard
+from clipboard.PyperClipboard import PyperclipClipboard
 
 
 class Clipboard(Protocol):

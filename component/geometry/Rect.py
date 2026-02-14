@@ -1,10 +1,10 @@
+from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional
 
 import pyxel
 
 
-@dataclass
+@dataclass(frozen=True)
 class Rect:
     x: int
     y: int
@@ -14,17 +14,14 @@ class Rect:
     def contains(self, mx: int, my: int) -> bool:
         return self.x <= mx < self.x + self.w and self.y <= my < self.y + self.h
 
-    def fill(self, color: int) -> None:
-        pyxel.rect(self.x, self.y, self.w, self.h, color)
+    def inset(self, dx: int, dy: int) -> Rect:
+        return Rect(self.x + dx, self.y + dy, max(0, self.w - 2 * dx), max(0, self.h - 2 * dy))
 
-    def border(self, color: int) -> None:
-        pyxel.rectb(self.x, self.y, self.w, self.h, color)
+    def fill(self, col: int) -> None:
+        pyxel.rect(self.x, self.y, self.w, self.h, col)
 
-    def draw(self, fill: Optional[int] = None, border: Optional[int] = None) -> None:
-        if fill is not None:
-            self.fill(fill)
-        if border is not None:
-            self.border(border)
+    def border(self, col: int) -> None:
+        pyxel.rectb(self.x, self.y, self.w, self.h, col)
 
     def clip_begin(self) -> None:
         pyxel.clip(self.x, self.y, self.w, self.h)

@@ -1,16 +1,20 @@
+from __future__ import annotations
+
 import pyxel
 
 from component.geometry.Rect import Rect
+from render.FieldRenderer import FieldRenderer, default_field_renderer
 
 
 class NumberField:
-    def __init__(self, rect: Rect, value: str, min_val: int, max_val: int):
+    def __init__(self, rect: Rect, value: str, min_val: int, max_val: int, renderer: FieldRenderer | None = None):
         self.rect = rect
         self.value = value
         self.min_val = min_val
         self.max_val = max_val
         self.active = False
         self.cursor = len(value)
+        self.r = renderer or default_field_renderer
 
     def blur(self) -> None:
         self.active = False
@@ -24,7 +28,6 @@ class NumberField:
             v = int(self.value) if self.value else 0
         except ValueError:
             v = self.min_val
-
         v = max(self.min_val, min(self.max_val, v))
         self.value = str(v)
         self.cursor = min(self.cursor, len(self.value))
@@ -41,7 +44,6 @@ class NumberField:
 
         if pyxel.btnp(pyxel.KEY_LEFT, 18, 2):
             self.cursor = max(0, self.cursor - 1)
-
         if pyxel.btnp(pyxel.KEY_RIGHT, 18, 2):
             self.cursor = min(len(self.value), self.cursor + 1)
 
@@ -61,35 +63,4 @@ class NumberField:
         self._clamp()
 
     def draw(self, label: str) -> None:
-        self._draw_label(label)
-        self._draw_field_background()
-        self._draw_value()
-        self._draw_caret()
-
-    def _draw_label(self, label: str) -> None:
-        pyxel.text(self.rect.x, self.rect.y - 13, label, 7)
-
-    def _draw_field_background(self) -> None:
-        self.rect.fill(0)
-        self.rect.border(11 if self.active else 5)
-
-    def _draw_value(self) -> None:
-        max_chars = max(1, (self.rect.w - 8) // 4)
-        txt = self.value[-max_chars:] if len(self.value) > max_chars else self.value
-        pyxel.text(self.rect.x + 4, self.rect.y + 3, txt, 7)
-
-    def _draw_caret(self) -> None:
-        if not self.active:
-            return
-
-        if (pyxel.frame_count // 20) % 2 != 0:
-            return
-
-        max_chars = max(1, (self.rect.w - 8) // 4)
-        visible_start = max(0, len(self.value) - max_chars)
-        visible_cursor = max(0, self.cursor - visible_start)
-
-        cx = self.rect.x + 4 + visible_cursor * 4
-
-        if cx < self.rect.x + self.rect.w - 2:
-            Rect(cx, self.rect.y + 3, 3, 5).fill(7)
+        self.r.draw_text_field(self.rect, label=label, text=self.value, active=self.active, cursor_pos=self.cursor)

@@ -3,8 +3,8 @@ import os
 import pyxel
 
 from component.button.Button import Button
-from component.UIDropdown import UIDropdown
-from component.NumberField import NumberField
+from component.Dropdown import UIDropdown
+from component.field.NumberField import NumberField
 from component.geometry.Rect import Rect
 
 

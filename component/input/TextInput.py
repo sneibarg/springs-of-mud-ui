@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections import deque
 from typing import Optional
-from input.Clipboard import Clipboard, default_clipboard
+from clipboard.Clipboard import Clipboard, default_clipboard
 
 import pyxel
 
@@ -190,7 +190,7 @@ class TextInput:
         if not txt:
             return
 
-        # Normalize paste for a single-line command input:
+        # Normalize paste for a single-line command clipboard:
         txt = txt.replace("\r\n", "\n").replace("\r", "\n")
         txt = txt.split("\n", 1)[0]  # keep first line only
 
