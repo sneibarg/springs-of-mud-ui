@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import List, Optional
 from component.geometry.Rect import Rect
-from render.FieldRenderer import FieldRenderer, default_field_renderer
+from component.render.FieldRenderer import FieldRenderer, default_field_renderer
 
 
 class Dropdown:

@@ -8,8 +8,8 @@ from component.menu.MenuBar import MenuBar
 from component.MessageDialog import MessageDialog
 from ui.panes.ConnectionSettingsPane import ConnectionSettingsPane
 from ui.panes.DisplaySettingsPane import DisplaySettingsPane
-from render.TextRenderer import TextRenderer
-from render.CursorRenderer import CursorRenderer
+from component.render.TextRenderer import TextRenderer
+from component.render.CursorRenderer import CursorRenderer
 
 
 class MudClientUI:

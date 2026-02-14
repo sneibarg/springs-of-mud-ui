@@ -99,8 +99,8 @@ class TextRenderer:
     def _input_rect(self, pane: Rect) -> Rect:
         return Rect(pane.x, pane.y + pane.h - self.m.input_h, pane.w, self.m.input_h)
 
-    def _draw_input(self,
-        input_rect: Rect, prompt: str, input_buf: str, input_cursor: int, has_selection: bool, selection_start: int | None, selection_end: int | None, blink_on: bool) -> None:
+    def _draw_input(self, input_rect: Rect, prompt: str, input_buf: str, input_cursor: int, has_selection: bool,
+                    selection_start: int | None, selection_end: int | None, blink_on: bool) -> None:
         self._draw_input_box(input_rect)
         self.t.draw_input(rect=input_rect, pad=self.m.pad, prompt=prompt, input_buf=input_buf, input_cursor=input_cursor,
                           blink_on=blink_on, has_selection=has_selection, selection_start=selection_start, selection_end=selection_end,
