@@ -20,22 +20,11 @@ class AuthClient:
 
         response = requests.post(self.auth_endpoint, json=payload)
         response.raise_for_status()
-
         data = response.json()
-        characters = [
-            PlayerCharacter(**char) for char in data.get("playerCharacterList", [])
-        ]
-
-        # Create auth response
-        self.auth_data = AuthResponse(
-            id=data["id"],
-            firstName=data["firstName"],
-            lastName=data["lastName"],
-            accountName=data["accountName"],
-            emailAddress=data["emailAddress"],
-            password=data["password"],
-            playerCharacterList=characters
-        )
+        characters = [PlayerCharacter(**char) for char in data.get("playerCharacterList", [])]
+        self.auth_data = AuthResponse(id=data["id"], firstName=data["firstName"], lastName=data["lastName"],
+                                      accountName=data["accountName"], emailAddress=data["emailAddress"],
+                                      password=data["password"], playerCharacterList=characters)
 
         if "Authorization" in response.headers:
             self.jwt_token = response.headers["Authorization"]

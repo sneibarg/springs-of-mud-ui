@@ -3,7 +3,7 @@ import os
 import pyxel
 
 from component.button.Button import Button
-from component.Dropdown import UIDropdown
+from component.Dropdown import Dropdown
 from component.field.NumberField import NumberField
 from component.geometry.Rect import Rect
 
@@ -54,9 +54,9 @@ class DisplaySettingsPane:
         self.f_chars = NumberField(Rect(fx, self.y + 43, fw, h), self.chars_per_line, 20, 200)
         self.f_lines = NumberField(Rect(fx, self.y + 76, fw, h), self.visible_lines, 10, 100)
 
-        self.dd_font_scale = UIDropdown(Rect(fx, self.y + 109, fw, h), self.font_scale_options, f"{self.font_scale}x")
-        self.dd_line_spacing = UIDropdown(Rect(fx, self.y + 142, fw, h), self.line_spacing_options, str(self.line_spacing))
-        self.dd_font = UIDropdown(Rect(fx, self.y + 175, fw, h), self.font_options, self.font_name)
+        self.dd_font_scale = Dropdown(Rect(fx, self.y + 109, fw, h), self.font_scale_options, f"{self.font_scale}x")
+        self.dd_line_spacing = Dropdown(Rect(fx, self.y + 142, fw, h), self.line_spacing_options, str(self.line_spacing))
+        self.dd_font = Dropdown(Rect(fx, self.y + 175, fw, h), self.font_options, self.font_name)
 
         self.f_window_h = NumberField(Rect(fx, self.y + 208, fw, h), self.window_height, 200, 800)
         self.f_scroll = NumberField(Rect(fx, self.y + 241, fw, h), self.scroll_buffer, 100, 10000)

@@ -3,6 +3,7 @@ from typing import Callable, Optional
 from component.button.Button import Button
 from component.geometry.Rect import Rect
 from component.field.TextField import TextField, TextStyle
+
 import pyxel
 
 

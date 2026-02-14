@@ -60,8 +60,7 @@ class ModalFrame:
         self.tf.draw_text(x=c.x + 2, y=c.y + 2, text="X", col=self.t.close_col)
 
     def _draw_overlay(self) -> None:
-        # classic dotted overlay
-        step = self.t.overlay_step
+        step = self.t.overlay_step  # classic dotted overlay
         for y in range(0, pyxel.height, step):
             for x in range(0, pyxel.width, step):
                 pyxel.pset(x, y, self.t.overlay_col)

@@ -4,7 +4,7 @@ from component.geometry.Rect import Rect
 from render.FieldRenderer import FieldRenderer, default_field_renderer
 
 
-class UIDropdown:
+class Dropdown:
     def __init__(self, rect: Rect, options: List[str], value: str, renderer: FieldRenderer | None = None):
         self.rect = rect
         self.options = options
