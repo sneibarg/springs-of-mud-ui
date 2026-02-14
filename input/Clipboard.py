@@ -1,5 +1,5 @@
 from typing import Protocol, Optional
-from input import TkClipboard
+from input.TkClipboard import TkClipboard
 from input.PyperClipboard import PyperclipClipboard
 
 

@@ -24,6 +24,7 @@ class NumberField:
             v = int(self.value) if self.value else 0
         except ValueError:
             v = self.min_val
+
         v = max(self.min_val, min(self.max_val, v))
         self.value = str(v)
         self.cursor = min(self.cursor, len(self.value))
@@ -40,6 +41,7 @@ class NumberField:
 
         if pyxel.btnp(pyxel.KEY_LEFT, 18, 2):
             self.cursor = max(0, self.cursor - 1)
+
         if pyxel.btnp(pyxel.KEY_RIGHT, 18, 2):
             self.cursor = min(len(self.value), self.cursor + 1)
 
@@ -59,17 +61,35 @@ class NumberField:
         self._clamp()
 
     def draw(self, label: str) -> None:
-        pyxel.text(self.rect.x, self.rect.y - 13, label, 7)
-        pyxel.rect(self.rect.x, self.rect.y, self.rect.w, self.rect.h, 0)
-        pyxel.rectb(self.rect.x, self.rect.y, self.rect.w, self.rect.h, 11 if self.active else 5)
+        self._draw_label(label)
+        self._draw_field_background()
+        self._draw_value()
+        self._draw_caret()
 
+    def _draw_label(self, label: str) -> None:
+        pyxel.text(self.rect.x, self.rect.y - 13, label, 7)
+
+    def _draw_field_background(self) -> None:
+        self.rect.fill(0)
+        self.rect.border(11 if self.active else 5)
+
+    def _draw_value(self) -> None:
         max_chars = max(1, (self.rect.w - 8) // 4)
         txt = self.value[-max_chars:] if len(self.value) > max_chars else self.value
         pyxel.text(self.rect.x + 4, self.rect.y + 3, txt, 7)
 
-        if self.active and (pyxel.frame_count // 20) % 2 == 0:
-            visible_start = max(0, len(self.value) - max_chars)
-            c = max(0, self.cursor - visible_start)
-            cx = self.rect.x + 4 + c * 4
-            if cx < self.rect.x + self.rect.w - 2:
-                pyxel.rect(cx, self.rect.y + 3, 3, 5, 7)
+    def _draw_caret(self) -> None:
+        if not self.active:
+            return
+
+        if (pyxel.frame_count // 20) % 2 != 0:
+            return
+
+        max_chars = max(1, (self.rect.w - 8) // 4)
+        visible_start = max(0, len(self.value) - max_chars)
+        visible_cursor = max(0, self.cursor - visible_start)
+
+        cx = self.rect.x + 4 + visible_cursor * 4
+
+        if cx < self.rect.x + self.rect.w - 2:
+            Rect(cx, self.rect.y + 3, 3, 5).fill(7)

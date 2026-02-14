@@ -12,6 +12,8 @@ class Button:
         self.hover_col = hover_col
         self.on_click = on_click
         self.hover = False
+        self._text_pad_x = 6
+        self._text_pad_y = 5
 
     def update(self, mx: int, my: int, click: bool) -> None:
         self.hover = self.rect.contains(mx, my)
@@ -19,10 +21,18 @@ class Button:
             self.on_click()
 
     def draw(self) -> None:
+        self._draw_background()
+        self._draw_border()
+        self._draw_label()
+
+    def _draw_background(self) -> None:
         col = self.hover_col if self.hover else self.base_col
-        pyxel.rect(self.rect.x, self.rect.y, self.rect.w, self.rect.h, col)
-        pyxel.rectb(self.rect.x, self.rect.y, self.rect.w, self.rect.h, 7)
-        # crude centering
-        tx = self.rect.x + 6
-        ty = self.rect.y + 5
+        self.rect.fill(col)
+
+    def _draw_border(self) -> None:
+        self.rect.border(7)
+
+    def _draw_label(self) -> None:
+        tx = self.rect.x + self._text_pad_x
+        ty = self.rect.y + self._text_pad_y
         pyxel.text(tx, ty, self.text, 7)
