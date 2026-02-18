@@ -1,78 +1,108 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Optional, Sequence
+
 from component.geometry.Rect import Rect
-from component.field.TextField import TextField
+from component.render.TextField import TextField
 
 
 @dataclass(frozen=True)
-class ListBoxTheme:
-    fill: int = 0
-    border: int = 5
+class ListBoxStyle:
+    bg_col: int = 0
+    border_col: int = 5
     header_col: int = 7
+    header_y_pad: int = 3
     text_col: int = 7
-    hover_fill: int = 2
-    selected_fill: int = 5
+    row_hover_col: int = 2
+    row_selected_col: int = 5
+    text_x_pad: int = 3
+    text_y_pad: int = 2
 
 
 class ListBox:
-    """
-    Displays a vertical list and returns clicked index.
-    - No pane-side manual row math.
-    - Drawing uses Rect/TextField only.
-    """
-    def __init__(self, box: Rect, items_rect: Rect, *, header: str, row_h: int = 12, max_rows: Optional[int] = None,
-                 text: Optional[TextField] = None, theme: Optional[ListBoxTheme] = None):
-        self.box = box
-        self.items_rect = items_rect
+    def __init__(
+        self,
+        box_rect: Rect,
+        items_rect: Rect,
+        *,
+        header: str = "",
+        row_h: int = 12,
+        text: Optional[TextField] = None,
+        style: Optional[ListBoxStyle] = None,
+    ):
+        self.box = box_rect
+        self.items = items_rect
         self.header = header
         self.row_h = row_h
-        self.max_rows = max_rows
         self.tf = text or TextField()
-        self.t = theme or ListBoxTheme()
+        self.s = style or ListBoxStyle()
         self.hovered_idx: Optional[int] = None
 
-    def update_hover(self, mx: int, my: int, item_count: int) -> None:
-        self.hovered_idx = self._index_at(mx, my, item_count)
+    def update_hover(self, ctx, item_count: int) -> None:
+        mx, my = ctx.input.mx, ctx.input.my
+        self.hovered_idx = None
 
-    def click_index(self, mx: int, my: int, click: bool, item_count: int) -> Optional[int]:
-        if not click:
+        if item_count <= 0:
+            return
+        if not self.items.contains(mx, my):
+            return
+
+        idx = (my - self.items.y) // self.row_h
+        if 0 <= idx < item_count and self._row_visible(idx):
+            self.hovered_idx = idx
+
+    def click_index(self, ctx, item_count: int) -> Optional[int]:
+        if not ctx.input.click:
             return None
-        return self._index_at(mx, my, item_count)
 
-    def _index_at(self, mx: int, my: int, item_count: int) -> Optional[int]:
-        if not self.items_rect.contains(mx, my):
+        mx, my = ctx.input.mx, ctx.input.my
+        if item_count <= 0:
             return None
-        idx = (my - self.items_rect.y) // self.row_h
-        if idx < 0 or idx >= item_count:
+        if not self.items.contains(mx, my):
             return None
-        if self.max_rows is not None and idx >= self.max_rows:
-            return None
-        return idx
 
-    def draw(self, *, items: List[str], selected_idx: Optional[int]) -> None:
-        self.box.fill(self.t.fill)
-        self.box.border(self.t.border)
-        self.tf.draw_text(x=self.box.x + 3, y=self.box.y + 3, text=self.header, col=self.t.header_col)
+        idx = (my - self.items.y) // self.row_h
+        if 0 <= idx < item_count and self._row_visible(idx):
+            return idx
+        return None
 
-        y = self.items_rect.y
-        rows = items
-        if self.max_rows is not None:
-            rows = rows[: self.max_rows]
+    def _row_visible(self, idx: int) -> bool:
+        """Prevent clicks/hover beyond the visible area inside the box."""
+        y = self.items.y + idx * self.row_h
+        return (y + self.row_h) <= (self.box.y + self.box.h - 1)
 
-        max_chars = max(1, (self.items_rect.w - 10) // self.tf.s.char_w)
+    def draw(self, ctx, *, items: Sequence[str], selected_idx: Optional[int] = None) -> None:
+        self.box.fill(ctx, self.s.bg_col)
+        self.box.border(ctx, self.s.border_col)
+        if self.header:
+            self.tf.draw_text(ctx,
+                x=self.box.x + self.s.text_x_pad,
+                y=self.box.y + self.s.header_y_pad,
+                text=self.header,
+                col=self.s.header_col,
+            )
 
-        for idx, label in enumerate(rows):
-            row = Rect(self.items_rect.x + 1, y, self.items_rect.w - 2, self.row_h - 1)
+        max_chars = max(1, (self.items.w - (self.s.text_x_pad * 2)) // self.tf.s.char_w)
 
-            if idx == selected_idx:
-                row.fill(self.t.selected_fill)
-            elif idx == self.hovered_idx:
-                row.fill(self.t.hover_fill)
+        y = self.items.y
+        for idx, label in enumerate(items):
+            if y + self.row_h > self.box.y + self.box.h - 1:
+                break
 
-            txt = label
-            if len(txt) > max_chars:
-                txt = txt[: max_chars - 2] + ".."
+            row = Rect(self.items.x + 1, y, self.items.w - 2, self.row_h - 1)
+            if selected_idx is not None and idx == selected_idx:
+                row.fill(ctx, self.s.row_selected_col)
+            elif self.hovered_idx is not None and idx == self.hovered_idx:
+                row.fill(ctx, self.s.row_hover_col)
 
-            self.tf.draw_text(x=self.items_rect.x + 3, y=y + 2, text=txt, col=self.t.text_col)
+            txt = self._clip(label, max_chars)
+            self.tf.draw_text(ctx, x=self.items.x + self.s.text_x_pad, y=y + self.s.text_y_pad, text=txt, col=self.s.text_col)
             y += self.row_h
+
+    def _clip(self, text: str, max_chars: int) -> str:
+        if len(text) <= max_chars:
+            return text
+        if max_chars <= 2:
+            return text[:max_chars]
+        return text[: max_chars - 2] + ".."

@@ -2,9 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 from component.geometry.Rect import Rect
-from component.field.TextField import TextField
-
-import pyxel
+from component.render.TextField import TextField
 
 
 @dataclass(frozen=True)
@@ -20,16 +18,14 @@ class ModalTheme:
 
 
 class ModalFrame:
-    """
-    Owns:
-      - dim overlay
-      - panel rect + border
-      - title bar + title text
-      - close button (Rect hit-test + draw)
-    Pane just asks: did_close(mx,my,click)?
-    """
-
-    def __init__(self, panel: Rect, title: str, *, theme: Optional[ModalTheme] = None, text: Optional[TextField] = None):
+    def __init__(
+        self,
+        panel: Rect,
+        title: str,
+        *,
+        theme: Optional[ModalTheme] = None,
+        text: Optional[TextField] = None,
+    ):
         self.panel = panel
         self.title = title
         self.t = theme or ModalTheme()
@@ -46,21 +42,24 @@ class ModalFrame:
     def did_close(self, mx: int, my: int, click: bool) -> bool:
         return click and self.close_rect.contains(mx, my)
 
-    def draw(self) -> None:
-        self._draw_overlay()
-        self.panel.fill(self.t.panel_fill)
-        self.panel.border(self.t.panel_border)
+    def draw(self, ctx) -> None:
+        self._draw_overlay(ctx)
+
+        self.panel.fill(ctx, self.t.panel_fill)
+        self.panel.border(ctx, self.t.panel_border)
 
         tb = self.title_bar
-        tb.fill(self.t.title_fill)
-        self.tf.draw_text(x=tb.x + 10, y=tb.y + 7, text=self.title, col=self.t.title_col)
+        tb.fill(ctx, self.t.title_fill)
+        self.tf.draw_text(ctx, x=tb.x + 10, y=tb.y + 7, text=self.title, col=self.t.title_col)
 
         c = self.close_rect
-        c.fill(self.t.close_fill)
-        self.tf.draw_text(x=c.x + 2, y=c.y + 2, text="X", col=self.t.close_col)
+        c.fill(ctx, self.t.close_fill)
+        self.tf.draw_text(ctx, x=c.x + 2, y=c.y + 2, text="X", col=self.t.close_col)
 
-    def _draw_overlay(self) -> None:
-        step = self.t.overlay_step  # classic dotted overlay
-        for y in range(0, pyxel.height, step):
-            for x in range(0, pyxel.width, step):
-                pyxel.pset(x, y, self.t.overlay_col)
+    def _draw_overlay(self, ctx) -> None:
+        step = self.t.overlay_step
+        w = ctx.layout.w
+        h = ctx.layout.h
+        for y in range(0, h, step):
+            for x in range(0, w, step):
+                ctx.gfx.pset(x, y, self.t.overlay_col)

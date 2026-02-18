@@ -1,27 +1,38 @@
+from __future__ import annotations
+
 import json
 import os
-import pyxel
+from typing import Optional, Callable
 
 from component.button.Button import Button
-from component.Dropdown import Dropdown
-from component.field.NumberField import NumberField
+from component.field import NumberField
 from component.geometry.Rect import Rect
+from component.modal.Dropdown import Dropdown
+from component.modal.ModalFrame import ModalFrame
+from component.render.TextField import TextField
 
 
 class DisplaySettingsPane:
-    def __init__(self, x: int, y: int, width: int, height: int, message_dialog, mud_client_ui=None):
+    def __init__(self, x: int, y: int, width: int, height: int, message_dialog=None, mud_client_ui=None):
         self.x = x
         self.y = y
         self.width = width
         self.height = height
         self.visible = False
+
+        # legacy args kept for compatibility; pane should not depend on these anymore
         self.message_dialog = message_dialog
         self.mud_client_ui = mud_client_ui
+
         self.status_message = ""
         self.status_color = 7
+
+        # options
         self.font_scale_options = ["1x", "2x", "3x"]
         self.line_spacing_options = ["6", "7", "8", "9", "10"]
         self.font_options = ["pyxel_default", "dos_8x8", "press_start_2p"]
+
+        # persisted values (strings for fields)
         self.chars_per_line = "40"
         self.visible_lines = "20"
         self.font_scale = 1
@@ -31,33 +42,47 @@ class DisplaySettingsPane:
         self.game_pane_width = "256"
         self.text_pane_width = "400"
         self.font_name = "pyxel_default"
+
         self._load_settings()
+
+        self.tf = TextField()
         self._build_components()
+
+    # ---------- visibility ----------
 
     def show(self) -> None:
         self.visible = True
+        self._blur_all_fields()
+        self._close_all_dropdowns()
 
     def hide(self) -> None:
         self.visible = False
         self._close_all_dropdowns()
         self._blur_all_fields()
 
+    def toggle(self) -> None:
+        self.hide() if self.visible else self.show()
+
+    # ---------- layout / components ----------
+
     def _build_components(self) -> None:
         fx = self.x + 20
         fw = self.width - 40
         h = 12
 
-        self.panel = Rect(self.x, self.y, self.width, self.height)
-        self.title_bar = Rect(self.x, self.y, self.width, 20)
-        self.close_btn = Rect(self.x + self.width - 15, self.y + 5, 10, 10)
+        panel = Rect(self.x, self.y, self.width, self.height)
+        self.frame = ModalFrame(panel, "Display Settings", text=self.tf)
 
+        # fields
         self.f_chars = NumberField(Rect(fx, self.y + 43, fw, h), self.chars_per_line, 20, 200)
         self.f_lines = NumberField(Rect(fx, self.y + 76, fw, h), self.visible_lines, 10, 100)
 
+        # dropdowns
         self.dd_font_scale = Dropdown(Rect(fx, self.y + 109, fw, h), self.font_scale_options, f"{self.font_scale}x")
         self.dd_line_spacing = Dropdown(Rect(fx, self.y + 142, fw, h), self.line_spacing_options, str(self.line_spacing))
         self.dd_font = Dropdown(Rect(fx, self.y + 175, fw, h), self.font_options, self.font_name)
 
+        # more fields
         self.f_window_h = NumberField(Rect(fx, self.y + 208, fw, h), self.window_height, 200, 800)
         self.f_scroll = NumberField(Rect(fx, self.y + 241, fw, h), self.scroll_buffer, 100, 10000)
         self.f_game_w = NumberField(Rect(fx, self.y + 274, fw, h), self.game_pane_width, 100, 1920)
@@ -68,6 +93,9 @@ class DisplaySettingsPane:
         self.btn_save = Button(Rect(self.x + 80, by, 50, 15), "Save", 2, 3, self._save_settings)
         self.btn_apply = Button(Rect(self.x + 140, by, 60, 15), "Apply", 3, 11, self._apply_settings)
 
+        self._status_x = self.x + 20
+        self._status_y = self.y + self.height - 10
+
     def _close_all_dropdowns(self) -> None:
         self.dd_font_scale.close()
         self.dd_line_spacing.close()
@@ -76,6 +104,8 @@ class DisplaySettingsPane:
     def _blur_all_fields(self) -> None:
         for f in (self.f_chars, self.f_lines, self.f_window_h, self.f_scroll, self.f_game_w, self.f_text_w):
             f.blur()
+
+    # ---------- persistence ----------
 
     @staticmethod
     def _get_settings_path() -> str:
@@ -89,15 +119,20 @@ class DisplaySettingsPane:
             if os.path.exists(p):
                 with open(p, "r") as f:
                     s = json.load(f)
-                self.chars_per_line = str(s.get("chars_per_line", 40))
-                self.visible_lines = str(s.get("visible_lines", 20))
-                self.font_scale = int(s.get("font_scale", 1))
-                self.line_spacing = int(s.get("line_spacing", 7))
-                self.window_height = str(s.get("window_height", 400))
-                self.scroll_buffer = str(s.get("scroll_buffer", 500))
-                self.game_pane_width = str(s.get("game_pane_width", 256))
-                self.text_pane_width = str(s.get("text_pane_width", 400))
-                self.font_name = s.get("font_name", "pyxel_default")
+
+            else:
+                return
+
+            self.chars_per_line = str(s.get("chars_per_line", 40))
+            self.visible_lines = str(s.get("visible_lines", 20))
+            self.font_scale = int(s.get("font_scale", 1))
+            self.line_spacing = int(s.get("line_spacing", 7))
+            self.window_height = str(s.get("window_height", 400))
+            self.scroll_buffer = str(s.get("scroll_buffer", 500))
+            self.game_pane_width = str(s.get("game_pane_width", 256))
+            self.text_pane_width = str(s.get("text_pane_width", 400))
+            self.font_name = s.get("font_name", "pyxel_default")
+
         except Exception as e:
             print(f"Failed to load display settings: {e}")
 
@@ -127,21 +162,22 @@ class DisplaySettingsPane:
                 "text_pane_width": int(self.text_pane_width),
                 "font_name": self.font_name,
             }
+
             p = self._get_settings_path()
             with open(p, "w") as f:
                 json.dump(settings, f, indent=2)
 
+            # save implies apply
             self._apply_settings()
-            self.status_message = "Settings saved and applied"
-            self.status_color = 11
+            self._set_status("Settings saved and applied", 11)
+
         except Exception as e:
-            self.status_message = f"Failed to save: {str(e)[:20]}"
-            self.status_color = 8
+            self._set_status(f"Failed to save: {str(e)[:40]}", 8)
 
     def _apply_settings(self) -> None:
         self._sync_from_widgets()
-        if self.mud_client_ui:
-            self.mud_client_ui.apply_display_settings(
+        if self._last_ctx is not None:
+            self._last_ctx.apply_display_settings(
                 int(self.chars_per_line),
                 int(self.visible_lines),
                 int(self.font_scale),
@@ -152,8 +188,7 @@ class DisplaySettingsPane:
                 int(self.text_pane_width),
                 self.font_name,
             )
-        self.status_message = "Settings applied (restart for full effect)"
-        self.status_color = 11
+        self._set_status("Settings applied (restart for full effect)", 11)
 
     def _reset_settings(self) -> None:
         self.f_chars.value = "40"
@@ -165,102 +200,84 @@ class DisplaySettingsPane:
         self.f_scroll.value = "500"
         self.f_game_w.value = "256"
         self.f_text_w.value = "400"
-        self.status_message = "Settings reset to defaults"
-        self.status_color = 11
+        self._set_status("Settings reset to defaults", 11)
 
-    def update(self) -> None:
+    # ---------- update/draw (ctx pattern) ----------
+
+    def update(self, ctx) -> None:
         if not self.visible:
             return
 
-        mx, my = pyxel.mouse_x, pyxel.mouse_y
-        click = pyxel.btnp(pyxel.MOUSE_BUTTON_LEFT)
-        if click and self.close_btn.contains(mx, my):
+        # store ctx so button actions can call apply_display_settings()
+        self._ctx = ctx
+        self._last_ctx = ctx
+
+        mx, my, click = ctx.input.mx, ctx.input.my, ctx.input.click
+
+        if self.frame.did_close(mx, my, click):
             self.hide()
             return
 
-        self._update_fields(mx, my, click)
-        self._update_dropdowns(mx, my, click)
-        self._update_buttons(mx, my, click)
-
-    def _update_fields(self, mx: int, my: int, click: bool) -> None:
+        # components update on ctx
         for f in (self.f_chars, self.f_lines, self.f_window_h, self.f_scroll, self.f_game_w, self.f_text_w):
-            f.update(mx, my, click)
+            f.update(ctx)
 
-    def _update_dropdowns(self, mx: int, my: int, click: bool) -> None:
-        self.dd_font_scale.update(mx, my, click)
+        self.dd_font_scale.update(ctx)
         if self.dd_font_scale.open:
             self.dd_line_spacing.close()
             self.dd_font.close()
 
-        self.dd_line_spacing.update(mx, my, click)
+        self.dd_line_spacing.update(ctx)
         if self.dd_line_spacing.open:
             self.dd_font_scale.close()
             self.dd_font.close()
 
-        self.dd_font.update(mx, my, click)
+        self.dd_font.update(ctx)
         if self.dd_font.open:
             self.dd_font_scale.close()
             self.dd_line_spacing.close()
 
-    def _update_buttons(self, mx: int, my: int, click: bool) -> None:
-        self.btn_reset.update(mx, my, click)
-        self.btn_save.update(mx, my, click)
-        self.btn_apply.update(mx, my, click)
+        self.btn_reset.update(ctx)
+        self.btn_save.update(ctx)
+        self.btn_apply.update(ctx)
 
-    def draw(self) -> None:
+    def draw(self, ctx) -> None:
         if not self.visible:
             return
 
-        self._draw_overlay()
-        self._draw_frame()
-        self._draw_title()
-        self._draw_close()
-        self._draw_widgets()
-        self._draw_buttons()
-        self._draw_dropdown_popups()
-        self._draw_status()
+        # IMPORTANT: ctx passed
+        self.frame.draw(ctx)
 
-    @staticmethod
-    def _draw_overlay() -> None:
-        for y in range(0, pyxel.height, 2):
-            for x in range(0, pyxel.width, 2):
-                pyxel.pset(x, y, 0)
+        # labels + widgets (all ctx-driven)
+        self.f_chars.draw(ctx, "Characters per line:")
+        self.f_lines.draw(ctx, "Visible lines:")
 
-    def _draw_frame(self) -> None:
-        self.panel.fill(1)
-        self.panel.border(5)
+        self.dd_font_scale.draw(ctx, "Font scale:")
+        self.dd_line_spacing.draw(ctx, "Line spacing:")
+        self.dd_font.draw(ctx, "Font:")
 
-    def _draw_title(self) -> None:
-        self.title_bar.fill(5)
-        pyxel.text(self.x + 10, self.y + 7, "Display Settings", 7)
+        self.f_window_h.draw(ctx, "Window height:")
+        self.f_scroll.draw(ctx, "Scroll buffer (lines):")
+        self.f_game_w.draw(ctx, "Game pane width (px):")
+        self.f_text_w.draw(ctx, "Text pane width (px):")
 
-    def _draw_close(self) -> None:
-        self.close_btn.fill(8)
-        pyxel.text(self.close_btn.x + 2, self.close_btn.y + 2, "X", 7)
+        self.btn_reset.draw(ctx)
+        self.btn_save.draw(ctx)
+        self.btn_apply.draw(ctx)
 
-    def _draw_widgets(self) -> None:
-        self.f_chars.draw("Characters per line:")
-        self.f_lines.draw("Visible lines:")
+        # popups last
+        self.dd_font_scale.draw_popup(ctx)
+        self.dd_line_spacing.draw_popup(ctx)
+        self.dd_font.draw_popup(ctx)
 
-        self.dd_font_scale.draw("Font scale:")
-        self.dd_line_spacing.draw("Line spacing:")
-        self.dd_font.draw("Font:")
-
-        self.f_window_h.draw("Window height:")
-        self.f_scroll.draw("Scroll buffer (lines):")
-        self.f_game_w.draw("Game pane width (px):")
-        self.f_text_w.draw("Text pane width (px):")
-
-    def _draw_buttons(self) -> None:
-        self.btn_reset.draw()
-        self.btn_save.draw()
-        self.btn_apply.draw()
-
-    def _draw_dropdown_popups(self) -> None:  # Popups LAST so they sit above the dim/background/panel
-        self.dd_font_scale.draw_popup()
-        self.dd_line_spacing.draw_popup()
-        self.dd_font.draw_popup()
-
-    def _draw_status(self) -> None:
         if self.status_message:
-            pyxel.text(self.x + 20, self.y + self.height - 10, self.status_message, self.status_color)
+            self.tf.draw_text(ctx, x=self._status_x, y=self._status_y, text=self.status_message, col=self.status_color)
+
+    # ---------- helpers ----------
+
+    def _set_status(self, msg: str, col: int) -> None:
+        self.status_message = msg
+        self.status_color = col
+
+    # NOTE: set in update()
+    _ctx = None
