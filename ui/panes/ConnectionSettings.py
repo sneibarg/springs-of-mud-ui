@@ -15,13 +15,14 @@ import os
 
 
 class ConnectionSettings:
-    def __init__(self, x: int, y: int, width: int, height: int, message_dialog):
+    def __init__(self, x: int, y: int, width: int, height: int, message_dialog, on_connect_callback=None):
         self.x = x
         self.y = y
         self.width = width
         self.height = height
         self.visible = False
         self.message_dialog: MessageDialog = message_dialog
+        self.on_connect_callback = on_connect_callback
         self.status_message = ""
         self.status_color = 7
         self.password_visible = False
@@ -82,7 +83,7 @@ class ConnectionSettings:
         self.m_account = TextInputModel(value="", cursor=0, active=False)
         self.m_pass = TextInputModel(value="", cursor=0, active=False)
         self.m_tn_host = TextInputModel(value="localhost", cursor=0, active=False)
-        self.m_tn_port = TextInputModel(value="4000", cursor=0, active=False)
+        self.m_tn_port = TextInputModel(value="6969", cursor=0, active=False)
 
         # --- field positions (top-anchored, consistent spacing) ---
         fields_top = self.y + top_pad + 5
@@ -239,6 +240,12 @@ class ConnectionSettings:
             self.m_pass.value = self._deobfuscate_password(conn.get("password", ""))
             self.m_pass.cursor = len(self.m_pass.value)
 
+            self.m_tn_host.value = conn.get("telnet_host", "localhost")
+            self.m_tn_host.cursor = len(self.m_tn_host.value)
+
+            self.m_tn_port.value = conn.get("telnet_port", "6969")
+            self.m_tn_port.cursor = len(self.m_tn_port.value)
+
             self.selected_connection_idx = idx
             self.status_message = f"Loaded '{self.m_name.value}'"
             self.status_color = 11
@@ -255,6 +262,8 @@ class ConnectionSettings:
             "server_url": self.m_server.value.strip(),
             "account_name": self.m_account.value.strip(),
             "password": self._obfuscate_password(self.m_pass.value),
+            "telnet_host": self.m_tn_host.value.strip(),
+            "telnet_port": self.m_tn_port.value.strip(),
         }
 
         if self.selected_connection_idx is not None:
@@ -288,6 +297,18 @@ class ConnectionSettings:
 
             if ctx is not None and result.playerCharacterList:
                 ctx.set_character_list(result.playerCharacterList)
+
+            # Call the callback with auth data and connection info
+            if self.on_connect_callback:
+                connection_info = {
+                    "auth_data": result,
+                    "telnet_host": self.m_tn_host.value.strip(),
+                    "telnet_port": int(self.m_tn_port.value.strip())
+                }
+                self.on_connect_callback(connection_info)
+
+            # Hide the settings panel after successful connection
+            self.hide()
 
         except Exception as e:
             self.message_dialog.show(ctx, "Connection Failed", f"Failed to authenticate: {str(e)}")

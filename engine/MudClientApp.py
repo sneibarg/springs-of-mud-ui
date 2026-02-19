@@ -23,6 +23,7 @@ class MudClientApp:
         visible_lines: int,
         line_spacing: int,
         font_scale: int,
+        poll_callback=None,
     ):
         self.layout = layout
         self.text_input = text_input
@@ -31,6 +32,7 @@ class MudClientApp:
         self.visible_lines = visible_lines
         self.line_spacing = line_spacing
         self.font_scale = font_scale
+        self.poll_callback = poll_callback
         self.driver = PyxelDriver(title=title, w=layout.w, h=layout.h)
         self._components: List[GameComponent] = []
         self._character_list = []
@@ -76,6 +78,10 @@ class MudClientApp:
         self.driver.run(self.update, self.draw)
 
     def update(self) -> None:
+        # Poll for telnet messages if callback provided
+        if self.poll_callback:
+            self.poll_callback()
+
         self._ctx.input = self.driver.sample_input()
         self._ctx.scrollback = self.scrollback
         self._ctx.scroll_offset = self.scroll_offset

@@ -1,5 +1,5 @@
 from typing import Optional, Dict
-from domain.PlayerCharacter import PlayerCharacter
+from domain import PlayerCharacter
 from net.rest import AuthResponse
 
 import requests

@@ -4,6 +4,7 @@ clipboard/__pycache__
 net/rest/__pycache__
 ui/panes/__pycache__
 ui/layout/__pycache__
+domain/__pycache__
 *.py[cod]
 *$py.class
 

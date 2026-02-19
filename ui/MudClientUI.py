@@ -7,10 +7,12 @@ from component.render import CursorRenderer, TextRenderer
 from component.app import GameWorld, ModalGate, TextPane, InputCommand, Divider, UIOverlay, Cursor
 from engine import MudClientApp
 from net.telnet import TelnetClient, TelnetConfig
+from net.rest import AuthResponse
 from ui.layout import Layout
 from ui.panes import ConnectionSettings, DisplaySettings
 
 import time
+import json
 
 
 class MudClientUI:
@@ -18,6 +20,7 @@ class MudClientUI:
         self._telnet_host:str = "localhost"
         self._telnet_port: int = 6969
         self._telnet: TelnetClient | None = None
+        self._auth_data: AuthResponse | None = None
         self.text_font_name = None
         self.layout = Layout()
         self.settings = DisplaySettings(0, 0, 100, 100, None, None)
@@ -41,7 +44,8 @@ class MudClientUI:
         pane_y = (self.layout.h - pane_height) // 2
 
         self.message_dialog = MessageDialog()
-        self.connection_settings = ConnectionSettings(pane_x, pane_y, pane_width, pane_height, self.message_dialog)
+        self.connection_settings = ConnectionSettings(pane_x, pane_y, pane_width, pane_height, self.message_dialog,
+                                                      on_connect_callback=self._on_connection_established)
 
         display_pane_height = min(380, self.layout.h - 20)
         display_pane_y = max(10, (self.layout.h - display_pane_height) // 2)
@@ -61,7 +65,8 @@ class MudClientUI:
                                 scroll_offset=self.scroll_offset,
                                 visible_lines=self.visible_lines,
                                 line_spacing=self.line_spacing,
-                                font_scale=self.font_scale)
+                                font_scale=self.font_scale,
+                                poll_callback=self._poll_telnet_messages)
 
         text_renderer = TextRenderer()
         cursor_renderer = CursorRenderer()
@@ -82,6 +87,24 @@ class MudClientUI:
         self.log(f"Text pane width: {self.layout.ui_w}px (~{self.layout.ui_w // 4} chars visible)")
 
         self.app.run()
+
+    def _poll_telnet_messages(self) -> None:
+        """Poll for incoming telnet messages and display them"""
+        if self._telnet and self._telnet.connected:
+            line = self._telnet.poll_line()
+            if line:
+                self.log(line)
+
+    def _on_connection_established(self, connection_info: dict) -> None:
+        """Callback when ConnectionSettings successfully authenticates"""
+        self._auth_data = connection_info["auth_data"]
+        self._telnet_host = connection_info["telnet_host"]
+        self._telnet_port = connection_info["telnet_port"]
+
+        self.log(f"Authenticated as {self._auth_data.firstName} {self._auth_data.lastName}")
+        self.log(f"Telnet server: {self._telnet_host}:{self._telnet_port}")
+        self.log(f"Loaded {len(self._auth_data.playerCharacterList)} character(s)")
+        self.log("Type 'list' to see your characters, then 'logon <name>' to play")
 
     def show_connection_settings(self) -> None:
         self.connection_settings.show()
@@ -141,12 +164,18 @@ class MudClientUI:
         verb = parts[0].lower()
         if verb == "help":
             self.log("Commands: help, list, logon <name>, quit")
+            self.log("Use Settings -> Connections to authenticate first")
             return
 
         if verb == "list":
+            if not self._auth_data:
+                self.log("Please authenticate first via Settings -> Connections")
+                return
+
             self.log(" ")
-            for character in self.app._character_list:
-                self.log(f"- {character.name}")
+            self.log("Available characters:")
+            for character in self._auth_data.playerCharacterList:
+                self.log(f"- {character.name} (Level {character.level} {character.race} {character.characterClass})")
             return
 
         if verb == "logon":
@@ -154,12 +183,37 @@ class MudClientUI:
                 self.log("Usage: logon <characterName>")
                 return
 
+            if not self._auth_data:
+                self.log("Please authenticate first via Settings -> Connections")
+                return
+
             char_name = parts[1]
+
+            # Find character in auth data
+            selected_char = None
+            for char in self._auth_data.playerCharacterList:
+                if char.name.lower() == char_name.lower():
+                    selected_char = char
+                    break
+
+            if not selected_char:
+                self.log(f"Character '{char_name}' not found. Use 'list' to see available characters.")
+                return
+
             try:
                 t = self._ensure_telnet()
-                self._session_character = char_name
-                self.log(f"Starting session for '{char_name}'...")
-                t.send_line(f"logon {char_name}")
+                self.log(f"Connecting to {self._telnet_host}:{self._telnet_port} as {selected_char.name}...")
+
+                # Build payload for server
+                payload = {
+                    "accountId": self._auth_data.id,
+                    "characterId": selected_char.id,
+                    "characterName": selected_char.name
+                }
+
+                # Send as "logon <JSON>"
+                payload_json = json.dumps(payload)
+                t.send_line(f"logon {payload_json}")
 
             except Exception as e:
                 self.log(f"Logon failed: {e}")
