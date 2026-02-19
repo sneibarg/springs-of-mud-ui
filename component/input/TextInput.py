@@ -238,6 +238,6 @@ class TextInput:
             self.clear_selection()
             if cmd:
                 self.push_history(cmd)
-                return cmd
+            return cmd  # Return even if empty (allows empty commands)
 
         return None

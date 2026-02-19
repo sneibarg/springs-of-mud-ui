@@ -159,6 +159,14 @@ class MudClientUI:
 
         parts = cmd.strip().split()
         if not parts:
+            # Empty command - just send to server if connected, or show blank line
+            if self._telnet and self._telnet.connected:
+                try:
+                    self._telnet.send_line("")
+                except Exception as e:
+                    self.log(f"Send failed: {e}")
+            else:
+                self.log("")  # Just show a blank line
             return
 
         verb = parts[0].lower()
