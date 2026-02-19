@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections import deque
 from typing import Deque, List
 
+from component.input.TextInput import TextInput
 from component.render.PyxelGfx import PyxelGfx
 from engine.context.EngineContext import EngineContext
 from engine.context.GameComponent import GameComponent
 from engine.PyxelDriver import PyxelDriver
-from ui.layout.Layout import Layout
-from component.input.TextInput import TextInput
+from ui.layout import Layout
 
 
 class MudClientApp:

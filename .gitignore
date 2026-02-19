@@ -2,6 +2,8 @@
 __pycache__/
 clipboard/__pycache__
 net/rest/__pycache__
+ui/panes/__pycache__
+ui/layout/__pycache__
 *.py[cod]
 *$py.class
 

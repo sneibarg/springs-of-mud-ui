@@ -7,7 +7,7 @@ from component.input import TextInputField, TextInputModel
 from component.list.ListBox import ListBox
 from component.modal.ModalFrame import ModalFrame
 from component.render.TextField import TextField
-from net.rest.AuthClient import AuthClient
+from net.rest import AuthClient
 
 import base64
 import json

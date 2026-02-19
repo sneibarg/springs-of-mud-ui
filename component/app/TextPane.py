@@ -4,7 +4,7 @@ from component.render.TextRenderer import TextRenderer
 
 
 @dataclass
-class TextPaneComponent:
+class TextPane:
     text_renderer: TextRenderer
     title: str = "TEXT / COMMAND"
     z_index: int = 10

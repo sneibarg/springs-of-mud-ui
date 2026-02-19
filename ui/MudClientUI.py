@@ -1,21 +1,14 @@
 from __future__ import annotations
 from collections import deque
-from component.app.GameWorld import GameWorld
-from component.input.TextInput import TextInput
+from component.input import TextInput
 from component.menu import MenuBar
 from component.MessageDialog import MessageDialog
 from component.render import CursorRenderer, TextRenderer
-from component.app.ModalGate import ModalGate
-from component.app.TextPane import TextPaneComponent
-from component.app.InputCommand import InputCommand
-from component.app.Divider import Divider
-from component.app.UIOverlay import UIOverlay
-from component.app.Cursor import Cursor
-from engine.MudClientApp import MudClientApp
-from net.telnet.TelnetClient import TelnetClient, TelnetConfig
-from ui.layout.Layout import Layout
-from ui.panes.ConnectionSettings import ConnectionSettings
-from ui.panes.DisplaySettings import DisplaySettings
+from component.app import GameWorld, ModalGate, TextPane, InputCommand, Divider, UIOverlay, Cursor
+from engine import MudClientApp
+from net.telnet import TelnetClient, TelnetConfig
+from ui.layout import Layout
+from ui.panes import ConnectionSettings, DisplaySettings
 
 import time
 
@@ -75,7 +68,7 @@ class MudClientUI:
         gate = ModalGate([self.connection_settings, self.display_settings, self.message_dialog])
 
         self.app.add(GameWorld())
-        self.app.add(TextPaneComponent(text_renderer=text_renderer))
+        self.app.add(TextPane(text_renderer=text_renderer))
         self.app.add(Divider())
         self.app.add(InputCommand(gate=gate, on_command=self.handle_command))
         self.app.add(UIOverlay(menu_bar=self.menu_bar, message_dialog=self.message_dialog,
