@@ -12,18 +12,22 @@ from component.app.Divider import Divider
 from component.app.UIOverlay import UIOverlay
 from component.app.Cursor import Cursor
 from engine.MudClientApp import MudClientApp
+from net.telnet.TelnetClient import TelnetClient, TelnetConfig
 from ui.layout.Layout import Layout
-from ui.panes.ConnectionSettingsPane import ConnectionSettingsPane
-from ui.panes.DisplaySettingsPane import DisplaySettingsPane
+from ui.panes.ConnectionSettings import ConnectionSettings
+from ui.panes.DisplaySettings import DisplaySettings
 
 import time
 
 
 class MudClientUI:
     def __init__(self) -> None:
+        self._telnet_host:str = "localhost"
+        self._telnet_port: int = 6969
+        self._telnet: TelnetClient | None = None
         self.text_font_name = None
         self.layout = Layout()
-        self.settings = DisplaySettingsPane(0, 0, 100, 100, None, None)
+        self.settings = DisplaySettings(0, 0, 100, 100, None, None)
         self.layout.game_w = int(self.settings.game_pane_width)
         self.layout.ui_w = int(self.settings.text_pane_width)
         self.layout.h = int(self.settings.window_height)
@@ -39,17 +43,17 @@ class MudClientUI:
         settings_menu.add_item("Connections", self.show_connection_settings)
         settings_menu.add_item("Display", self.show_display_settings)
         pane_width = min(300, self.layout.w - 40)
-        pane_height = 180
+        pane_height = 300
         pane_x = (self.layout.w - pane_width) // 2
         pane_y = (self.layout.h - pane_height) // 2
 
         self.message_dialog = MessageDialog()
-        self.connection_settings = ConnectionSettingsPane(pane_x, pane_y, pane_width, pane_height, self.message_dialog, self)
+        self.connection_settings = ConnectionSettings(pane_x, pane_y, pane_width, pane_height, self.message_dialog)
 
         display_pane_height = min(380, self.layout.h - 20)
         display_pane_y = max(10, (self.layout.h - display_pane_height) // 2)
 
-        self.display_settings = DisplaySettingsPane(pane_x, display_pane_y, pane_width, display_pane_height, self.message_dialog, self)
+        self.display_settings = DisplaySettings(pane_x, display_pane_y, pane_width, display_pane_height, self.message_dialog, self)
 
         self.chars_per_line = int(self.display_settings.chars_per_line)
         self.visible_lines = int(self.display_settings.visible_lines)
@@ -57,10 +61,14 @@ class MudClientUI:
         self.line_spacing = int(self.display_settings.line_spacing)
 
         self.scroll_offset = 0
-
-        self.app = MudClientApp(title="Pyxel MUD Client (graphics + ui)", layout=self.layout, text_input=self.text_input,
-                                scrollback=self.scrollback, scroll_offset=self.scroll_offset, visible_lines=self.visible_lines,
-                                line_spacing=self.line_spacing, font_scale=self.font_scale)
+        self.app = MudClientApp(title="Pyxel MUD Client (graphics + ui)",
+                                layout=self.layout,
+                                text_input=self.text_input,
+                                scrollback=self.scrollback,
+                                scroll_offset=self.scroll_offset,
+                                visible_lines=self.visible_lines,
+                                line_spacing=self.line_spacing,
+                                font_scale=self.font_scale)
 
         text_renderer = TextRenderer()
         cursor_renderer = CursorRenderer()
@@ -133,17 +141,55 @@ class MudClientUI:
     def handle_command(self, cmd: str) -> None:
         self.log(f"> {cmd}")
 
-        if cmd == "help":
-            self.log("Commands: help, list, logon, quit")
-        if cmd == "list":
+        parts = cmd.strip().split()
+        if not parts:
+            return
+
+        verb = parts[0].lower()
+        if verb == "help":
+            self.log("Commands: help, list, logon <name>, quit")
+            return
+
+        if verb == "list":
             self.log(" ")
             for character in self.app._character_list:
                 self.log(f"- {character.name}")
-        if cmd.split()[0] == "logon":
-            pass
-        elif cmd == "quit":
+            return
+
+        if verb == "logon":
+            if len(parts) < 2:
+                self.log("Usage: logon <characterName>")
+                return
+
+            char_name = parts[1]
+            try:
+                t = self._ensure_telnet()
+                self._session_character = char_name
+                self.log(f"Starting session for '{char_name}'...")
+                t.send_line(f"logon {char_name}")
+
+            except Exception as e:
+                self.log(f"Logon failed: {e}")
+            return
+
+        if verb == "quit":
             self.log("Quitting the game. Goodbye!")
             time.sleep(0.5)
             self.close_app()
+            return
+
+        if self._telnet and self._telnet.connected:
+            try:
+                self._telnet.send_line(cmd)
+            except Exception as e:
+                self.log(f"Send failed: {e}")
         else:
-            self.log("Unknown command. Type 'help'.")
+            self.log("Unknown command. Type 'help'. (Not connected to telnet session.)")
+
+    def _ensure_telnet(self) -> TelnetClient:
+        if self._telnet is None:
+            self._telnet = TelnetClient(TelnetConfig(host=self._telnet_host, port=self._telnet_port), on_status=self.log)
+        if not self._telnet.connected:
+            self._telnet.connect()
+        return self._telnet
+

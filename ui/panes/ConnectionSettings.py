@@ -1,7 +1,5 @@
 from __future__ import annotations
-
 from typing import Optional, List, Dict
-
 from component.MessageDialog import MessageDialog
 from component.geometry.Rect import Rect
 from component.button.Button import Button
@@ -9,38 +7,30 @@ from component.input import TextInputField, TextInputModel
 from component.list.ListBox import ListBox
 from component.modal.ModalFrame import ModalFrame
 from component.render.TextField import TextField
-from net.client.AuthClient import AuthClient
+from net.rest.AuthClient import AuthClient
 
 import base64
 import json
 import os
 
 
-class ConnectionSettingsPane:
-    def __init__(self, x: int, y: int, width: int, height: int, message_dialog, mud_client_ui=None):
+class ConnectionSettings:
+    def __init__(self, x: int, y: int, width: int, height: int, message_dialog):
         self.x = x
         self.y = y
         self.width = width
         self.height = height
         self.visible = False
         self.message_dialog: MessageDialog = message_dialog
-
-        # legacy param kept for compatibility; no longer used
-        self.mud_client_ui = mud_client_ui
-
         self.status_message = ""
         self.status_color = 7
         self.password_visible = False
-
         self.saved_connections: List[Dict] = []
         self.selected_connection_idx: Optional[int] = None
-
         self.auth_client = AuthClient()
         self._load_connections()
-
         self.tf = TextField()
         self._ctx = None  # set in update()
-
         self._build_components()
 
     def show(self) -> None:
@@ -54,9 +44,18 @@ class ConnectionSettingsPane:
     def toggle(self) -> None:
         self.hide() if self.visible else self.show()
 
-    # ---------- layout/components ----------
-
     def _build_components(self) -> None:
+        # --- constants / rhythm ---
+        pad = 10
+        top_pad = 25  # below title bar
+        field_h = 12
+        label_to_field = 5  # label y -> field y
+        row_gap = 18  # distance between field tops
+        btn_h = 15
+        bottom_pad = 10
+        btn_row_gap = 8  # gap between last field area and buttons
+        status_h = 10  # one line
+
         list_w = 100
         form_x = self.x + list_w + 5
         fw = self.width - list_w - 25
@@ -64,42 +63,101 @@ class ConnectionSettingsPane:
         panel = Rect(self.x, self.y, self.width, self.height)
         self.frame = ModalFrame(panel, "Connection Settings", text=self.tf)
 
-        list_box = Rect(self.x + 5, self.y + 25, list_w - 5, self.height - 30)
-        list_items = Rect(self.x + 5, self.y + 40, list_w - 5, self.height - 45)
+        # --- anchor bottom elements first ---
+        buttons_y = self.y + self.height - bottom_pad - btn_h
+        status_y = buttons_y - btn_row_gap - status_h  # status sits just above buttons
+
+        # --- list box height: stop above status/buttons area ---
+        list_top = self.y + top_pad
+        list_bottom = status_y - 6
+        list_h = max(40, list_bottom - list_top)
+
+        list_box = Rect(self.x + 5, list_top, list_w - 5, list_h)
+        list_items = Rect(self.x + 5, list_top + 15, list_w - 5, list_h - 20)
         self.connections_list = ListBox(list_box, list_items, header="Connections", row_h=12, text=self.tf)
 
+        # --- models (add telnet models) ---
         self.m_name = TextInputModel(value="", cursor=0, active=False)
         self.m_server = TextInputModel(value="http://localhost:8169", cursor=0, active=False)
         self.m_account = TextInputModel(value="", cursor=0, active=False)
         self.m_pass = TextInputModel(value="", cursor=0, active=False)
+        self.m_tn_host = TextInputModel(value="localhost", cursor=0, active=False)
+        self.m_tn_port = TextInputModel(value="4000", cursor=0, active=False)
 
-        self.in_name = TextInputField(Rect(form_x + 10, self.y + 30, fw, 12), self.m_name, max_len=50, text_field=self.tf)
-        self.in_server = TextInputField(Rect(form_x + 10, self.y + 60, fw, 12), self.m_server, max_len=100, text_field=self.tf)
-        self.in_account = TextInputField(Rect(form_x + 10, self.y + 90, fw, 12), self.m_account, max_len=50, text_field=self.tf)
-        self.in_pass = TextInputField(
-            Rect(form_x + 10, self.y + 120, fw - 120, 12),
-            self.m_pass,
-            max_len=50,
-            text_field=self.tf,
-            mask_char="*",
-        )
+        # --- field positions (top-anchored, consistent spacing) ---
+        fields_top = self.y + top_pad + 5
 
-        by = self.y + 145
-        self.btn_new = Button(Rect(form_x + 10, by, 40, 15), "New", 2, 6, self._clear_fields)
-        self.btn_save = Button(Rect(form_x + 60, by, 50, 15), "Save", 2, 3, self._handle_save_connection)
-        self.btn_connect = Button(Rect(form_x + 120, by, 60, 15), "Connect", 3, 11, self._handle_connect)
+        y_name = fields_top + 0 * row_gap
+        y_server = fields_top + 2 * row_gap
+        y_acct = fields_top + 4 * row_gap
+        y_pass = fields_top + 6 * row_gap
+        y_tnhost = fields_top + 8 * row_gap
+        y_tnport = fields_top + 10 * row_gap
+
+        # move telnet rows up if we’d collide with status/buttons
+        last_field_bottom = (y_tnport + label_to_field + field_h)
+        max_bottom = status_y - 6
+        if last_field_bottom > max_bottom:
+            # compress spacing to fit
+            available = max(1, max_bottom - fields_top)
+            steps = 10  # index of last row
+            row_gap = max(14, available // steps)
+            y_name = fields_top + 0 * row_gap
+            y_server = fields_top + 2 * row_gap
+            y_acct = fields_top + 4 * row_gap
+            y_pass = fields_top + 6 * row_gap
+            y_tnhost = fields_top + 8 * row_gap
+            y_tnport = fields_top + 10 * row_gap
+
+        # --- widgets ---
+        self.in_name = TextInputField(Rect(form_x + pad, y_name + label_to_field, fw, field_h),
+                                      self.m_name, max_len=50, text_field=self.tf)
+        self.in_server = TextInputField(Rect(form_x + pad, y_server + label_to_field, fw, field_h),
+                                        self.m_server, max_len=100, text_field=self.tf)
+        self.in_account = TextInputField(Rect(form_x + pad, y_acct + label_to_field, fw, field_h),
+                                         self.m_account, max_len=50, text_field=self.tf)
+        self.in_pass = TextInputField(Rect(form_x + pad, y_pass + label_to_field, fw - 120, field_h),
+                                      self.m_pass, max_len=50, text_field=self.tf, mask_char="*")
+
+        # telnet host + port on one row (host wide, port narrow)
+        port_w = 60
+        gap = 6
+        host_w = fw - port_w - gap
+
+        self.tn_host = TextInputField(Rect(form_x + pad, y_tnhost + label_to_field, fw, field_h),
+                                      self.m_tn_host, max_len=64, text_field=self.tf)
+        self.tn_port = TextInputField(Rect(form_x + pad, y_tnport + label_to_field, port_w, field_h),
+                                      self.m_tn_port, max_len=5, text_field=self.tf)
+
+        # password toggle stays aligned with password row
         self.btn_toggle_pass = Button(
-            Rect(self.x + self.width - 120, self.y + 120, 110, 12),
-            "Show Password",
-            6,
-            5,
-            self._toggle_password_visibility,
+            Rect(self.x + self.width - 120, y_pass + label_to_field, 110, field_h),
+            "Show Password", 6, 5, self._toggle_password_visibility
         )
 
+        # --- buttons anchored to bottom ---
+        self.btn_new = Button(Rect(form_x + pad, buttons_y, 40, btn_h), "New", 2, 6, self._clear_fields)
+        self.btn_save = Button(Rect(form_x + pad + 50, buttons_y, 50, btn_h), "Save", 2, 3,
+                               self._handle_save_connection)
+        self.btn_connect = Button(Rect(form_x + pad + 110, buttons_y, 60, btn_h), "Connect", 3, 11,
+                                  self._handle_connect)
+
+        # --- cached label x’s and y’s for draw() ---
         self._form_x = form_x
+        self._label_x = form_x + pad
+        self._label_y = {
+            "name": y_name,
+            "server": y_server,
+            "account": y_acct,
+            "pass": y_pass,
+            "tn_host": y_tnhost,
+            "tn_port": y_tnport,
+        }
+        self._status_x = form_x + pad
+        self._status_y = status_y
 
     def _blur_all_fields(self) -> None:
-        for f in (self.in_name, self.in_server, self.in_account, self.in_pass):
+        for f in (self.in_name, self.in_server, self.in_account, self.in_pass, self.tn_host, self.tn_port):
             f.blur()
 
     def _toggle_password_visibility(self) -> None:
@@ -124,8 +182,6 @@ class ConnectionSettingsPane:
         self.status_message = ""
         self.status_color = 7
         self._blur_all_fields()
-
-    # ---------- persistence ----------
 
     @staticmethod
     def _obfuscate_password(password: str) -> str:
@@ -166,8 +222,6 @@ class ConnectionSettingsPane:
         except Exception as e:
             self.status_message = f"Failed to save: {str(e)[:20]}"
             self.status_color = 8
-
-    # ---------- actions ----------
 
     def _load_connection(self, idx: int) -> None:
         if 0 <= idx < len(self.saved_connections):
@@ -240,8 +294,6 @@ class ConnectionSettingsPane:
             self.status_message = "Connection failed"
             self.status_color = 8
 
-    # ---------- EngineContext pattern ----------
-
     def update(self, ctx) -> None:
         if not self.visible:
             return
@@ -263,7 +315,7 @@ class ConnectionSettingsPane:
             self._load_connection(idx)
             self._blur_all_fields()
 
-        for f in (self.in_name, self.in_server, self.in_account, self.in_pass):
+        for f in (self.in_name, self.in_server, self.in_account, self.in_pass, self.tn_host, self.tn_port):
             f.update(ctx)
 
         self.btn_toggle_pass.update(ctx)
@@ -280,22 +332,31 @@ class ConnectionSettingsPane:
         labels = [c.get("name", "Unnamed") for c in self.saved_connections]
         self.connections_list.draw(ctx, items=labels, selected_idx=self.selected_connection_idx)
 
-        self.tf.draw_text(ctx, x=self._form_x + 10, y=self.y + 25, text="Connection Name:", col=7)
+        lx = self._label_x
+        y = self._label_y
+
+        self.tf.draw_text(ctx, x=lx, y=y["name"], text="Authentication Connection Name:", col=7)
         self.in_name.draw(ctx)
 
-        self.tf.draw_text(ctx, x=self._form_x + 10, y=self.y + 55, text="Server URL:", col=7)
+        self.tf.draw_text(ctx, x=lx, y=y["server"], text="Authentication Server URL:", col=7)
         self.in_server.draw(ctx)
 
-        self.tf.draw_text(ctx, x=self._form_x + 10, y=self.y + 85, text="Account Name:", col=7)
+        self.tf.draw_text(ctx, x=lx, y=y["account"], text="Account Name:", col=7)
         self.in_account.draw(ctx)
 
-        self.tf.draw_text(ctx, x=self._form_x + 10, y=self.y + 115, text="Password:", col=7)
+        self.tf.draw_text(ctx, x=lx, y=y["pass"], text="Password:", col=7)
         self.in_pass.draw(ctx)
-
         self.btn_toggle_pass.draw(ctx)
+
+        self.tf.draw_text(ctx, x=lx, y=y["tn_host"], text="Telnet Host:", col=7)
+        self.tn_host.draw(ctx)
+
+        self.tf.draw_text(ctx, x=lx, y=y["tn_port"], text="Telnet Port:", col=7)
+        self.tn_port.draw(ctx)
+
         self.btn_new.draw(ctx)
         self.btn_save.draw(ctx)
         self.btn_connect.draw(ctx)
 
         if self.status_message:
-            self.tf.draw_text(ctx, x=self._form_x + 10, y=self.y + 165, text=self.status_message, col=self.status_color)
+            self.tf.draw_text(ctx, x=self._status_x, y=self._status_y, text=self.status_message, col=self.status_color)

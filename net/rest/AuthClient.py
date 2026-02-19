@@ -1,6 +1,6 @@
 from typing import Optional, Dict
 from domain.PlayerCharacter import PlayerCharacter
-from net.client.AuthResponse import AuthResponse
+from net.rest.AuthResponse import AuthResponse
 
 import requests
 

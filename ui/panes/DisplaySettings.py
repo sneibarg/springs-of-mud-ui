@@ -1,9 +1,4 @@
 from __future__ import annotations
-
-import json
-import os
-from typing import Optional, Callable
-
 from component.button.Button import Button
 from component.field import NumberField
 from component.geometry.Rect import Rect
@@ -11,8 +6,11 @@ from component.modal.Dropdown import Dropdown
 from component.modal.ModalFrame import ModalFrame
 from component.render.TextField import TextField
 
+import json
+import os
 
-class DisplaySettingsPane:
+
+class DisplaySettings:
     def __init__(self, x: int, y: int, width: int, height: int, message_dialog=None, mud_client_ui=None):
         self.x = x
         self.y = y
@@ -20,19 +18,16 @@ class DisplaySettingsPane:
         self.height = height
         self.visible = False
 
-        # legacy args kept for compatibility; pane should not depend on these anymore
         self.message_dialog = message_dialog
         self.mud_client_ui = mud_client_ui
 
         self.status_message = ""
         self.status_color = 7
 
-        # options
         self.font_scale_options = ["1x", "2x", "3x"]
         self.line_spacing_options = ["6", "7", "8", "9", "10"]
         self.font_options = ["pyxel_default", "dos_8x8", "press_start_2p"]
 
-        # persisted values (strings for fields)
         self.chars_per_line = "40"
         self.visible_lines = "20"
         self.font_scale = 1
@@ -42,13 +37,9 @@ class DisplaySettingsPane:
         self.game_pane_width = "256"
         self.text_pane_width = "400"
         self.font_name = "pyxel_default"
-
         self._load_settings()
-
         self.tf = TextField()
         self._build_components()
-
-    # ---------- visibility ----------
 
     def show(self) -> None:
         self.visible = True
@@ -63,8 +54,6 @@ class DisplaySettingsPane:
     def toggle(self) -> None:
         self.hide() if self.visible else self.show()
 
-    # ---------- layout / components ----------
-
     def _build_components(self) -> None:
         fx = self.x + 20
         fw = self.width - 40
@@ -72,17 +61,12 @@ class DisplaySettingsPane:
 
         panel = Rect(self.x, self.y, self.width, self.height)
         self.frame = ModalFrame(panel, "Display Settings", text=self.tf)
-
-        # fields
         self.f_chars = NumberField(Rect(fx, self.y + 43, fw, h), self.chars_per_line, 20, 200)
         self.f_lines = NumberField(Rect(fx, self.y + 76, fw, h), self.visible_lines, 10, 100)
-
-        # dropdowns
         self.dd_font_scale = Dropdown(Rect(fx, self.y + 109, fw, h), self.font_scale_options, f"{self.font_scale}x")
         self.dd_line_spacing = Dropdown(Rect(fx, self.y + 142, fw, h), self.line_spacing_options, str(self.line_spacing))
         self.dd_font = Dropdown(Rect(fx, self.y + 175, fw, h), self.font_options, self.font_name)
 
-        # more fields
         self.f_window_h = NumberField(Rect(fx, self.y + 208, fw, h), self.window_height, 200, 800)
         self.f_scroll = NumberField(Rect(fx, self.y + 241, fw, h), self.scroll_buffer, 100, 10000)
         self.f_game_w = NumberField(Rect(fx, self.y + 274, fw, h), self.game_pane_width, 100, 1920)
@@ -92,7 +76,6 @@ class DisplaySettingsPane:
         self.btn_reset = Button(Rect(self.x + 20, by, 50, 15), "Reset", 2, 6, self._reset_settings)
         self.btn_save = Button(Rect(self.x + 80, by, 50, 15), "Save", 2, 3, self._save_settings)
         self.btn_apply = Button(Rect(self.x + 140, by, 60, 15), "Apply", 3, 11, self._apply_settings)
-
         self._status_x = self.x + 20
         self._status_y = self.y + self.height - 10
 
@@ -104,8 +87,6 @@ class DisplaySettingsPane:
     def _blur_all_fields(self) -> None:
         for f in (self.f_chars, self.f_lines, self.f_window_h, self.f_scroll, self.f_game_w, self.f_text_w):
             f.blur()
-
-    # ---------- persistence ----------
 
     @staticmethod
     def _get_settings_path() -> str:
@@ -202,13 +183,10 @@ class DisplaySettingsPane:
         self.f_text_w.value = "400"
         self._set_status("Settings reset to defaults", 11)
 
-    # ---------- update/draw (ctx pattern) ----------
-
     def update(self, ctx) -> None:
         if not self.visible:
             return
 
-        # store ctx so button actions can call apply_display_settings()
         self._ctx = ctx
         self._last_ctx = ctx
 
@@ -218,7 +196,6 @@ class DisplaySettingsPane:
             self.hide()
             return
 
-        # components update on ctx
         for f in (self.f_chars, self.f_lines, self.f_window_h, self.f_scroll, self.f_game_w, self.f_text_w):
             f.update(ctx)
 
@@ -245,10 +222,8 @@ class DisplaySettingsPane:
         if not self.visible:
             return
 
-        # IMPORTANT: ctx passed
         self.frame.draw(ctx)
 
-        # labels + widgets (all ctx-driven)
         self.f_chars.draw(ctx, "Characters per line:")
         self.f_lines.draw(ctx, "Visible lines:")
 
@@ -265,7 +240,6 @@ class DisplaySettingsPane:
         self.btn_save.draw(ctx)
         self.btn_apply.draw(ctx)
 
-        # popups last
         self.dd_font_scale.draw_popup(ctx)
         self.dd_line_spacing.draw_popup(ctx)
         self.dd_font.draw_popup(ctx)
@@ -273,11 +247,8 @@ class DisplaySettingsPane:
         if self.status_message:
             self.tf.draw_text(ctx, x=self._status_x, y=self._status_y, text=self.status_message, col=self.status_color)
 
-    # ---------- helpers ----------
-
     def _set_status(self, msg: str, col: int) -> None:
         self.status_message = msg
         self.status_color = col
 
-    # NOTE: set in update()
     _ctx = None

@@ -1,7 +1,7 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 clipboard/__pycache__
-net/client/__pycache__
+net/rest/__pycache__
 *.py[cod]
 *$py.class
 

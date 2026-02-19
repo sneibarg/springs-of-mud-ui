@@ -3,16 +3,16 @@ from dataclasses import dataclass
 
 from component.menu import MenuBar
 from component.MessageDialog import MessageDialog
-from ui.panes.ConnectionSettingsPane import ConnectionSettingsPane
-from ui.panes.DisplaySettingsPane import DisplaySettingsPane
+from ui.panes.ConnectionSettings import ConnectionSettings
+from ui.panes.DisplaySettings import DisplaySettings
 
 
 @dataclass
 class UIOverlay:
     menu_bar: MenuBar
     message_dialog: MessageDialog
-    connection_settings: ConnectionSettingsPane
-    display_settings: DisplaySettingsPane
+    connection_settings: ConnectionSettings
+    display_settings: DisplaySettings
     z_index: int = 30
 
     def update(self, ctx) -> None:
