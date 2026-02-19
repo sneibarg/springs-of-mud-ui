@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional, List, Dict
-from component.MessageDialog import MessageDialog
+from component.modal.MessageDialog import MessageDialog
 from component.geometry.Rect import Rect
 from component.button.Button import Button
 from component.input import TextInputField, TextInputModel

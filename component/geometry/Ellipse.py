@@ -1,9 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
+from component.geometry.Shape import Shape, Drawable
 
 @dataclass(frozen=True)
-class Ellipse:
+class Ellipse(Shape, Drawable):
     x: int
     y: int
     rx: int

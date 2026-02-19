@@ -1,9 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
+from component.geometry.Shape import Shape, Drawable
 
 @dataclass(frozen=True)
-class Triangle:
+class Triangle(Shape, Drawable):
     x1: int
     y1: int
     x2: int

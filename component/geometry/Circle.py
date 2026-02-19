@@ -1,9 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from component.geometry.Shape import Shape, Drawable
 
 
 @dataclass(frozen=True)
-class Circle:
+class Circle(Shape, Drawable):
     x: int
     y: int
     r: int

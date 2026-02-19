@@ -1,9 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
+from component.geometry.Shape import Shape, Drawable
 
 @dataclass(frozen=True)
-class Point:
+class Point(Shape, Drawable):
     x: int
     y: int
 

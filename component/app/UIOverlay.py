@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from component.menu import MenuBar
-from component.MessageDialog import MessageDialog
+from component.modal.MessageDialog import MessageDialog
 from ui.panes.ConnectionSettings import ConnectionSettings
 from ui.panes.DisplaySettings import DisplaySettings
 

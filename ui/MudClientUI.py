@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections import deque
 from component.input import TextInput
 from component.menu import MenuBar
-from component.MessageDialog import MessageDialog
+from component.modal.MessageDialog import MessageDialog
 from component.render import CursorRenderer, TextRenderer
 from component.app import GameWorld, ModalGate, TextPane, InputCommand, Divider, UIOverlay, Cursor
 from engine import MudClientApp
@@ -32,31 +32,11 @@ class MudClientUI:
         self.scroll_buffer_size = int(self.settings.scroll_buffer)
         self.scrollback: deque[str] = deque(maxlen=self.scroll_buffer_size)
         self.menu_bar = MenuBar(x=0, y=0, width=self.layout.w, height=10)
-
-        file_menu = self.menu_bar.add_menu("File")
-        file_menu.add_item("Close", self.close_app)
-        settings_menu = self.menu_bar.add_menu("Settings")
-        settings_menu.add_item("Connections", self.show_connection_settings)
-        settings_menu.add_item("Display", self.show_display_settings)
-        pane_width = min(300, self.layout.w - 40)
-        pane_height = 300
-        pane_x = (self.layout.w - pane_width) // 2
-        pane_y = (self.layout.h - pane_height) // 2
-
-        self.message_dialog = MessageDialog()
-        self.connection_settings = ConnectionSettings(pane_x, pane_y, pane_width, pane_height, self.message_dialog,
-                                                      on_connect_callback=self._on_connection_established)
-
-        display_pane_height = min(380, self.layout.h - 20)
-        display_pane_y = max(10, (self.layout.h - display_pane_height) // 2)
-
-        self.display_settings = DisplaySettings(pane_x, display_pane_y, pane_width, display_pane_height, self.message_dialog, self)
-
+        self._setup_menus()
         self.chars_per_line = int(self.display_settings.chars_per_line)
         self.visible_lines = int(self.display_settings.visible_lines)
         self.font_scale = int(self.display_settings.font_scale)
         self.line_spacing = int(self.display_settings.line_spacing)
-
         self.scroll_offset = 0
         self.app = MudClientApp(title="Pyxel MUD Client (graphics + ui)",
                                 layout=self.layout,
@@ -67,18 +47,14 @@ class MudClientUI:
                                 line_spacing=self.line_spacing,
                                 font_scale=self.font_scale,
                                 poll_callback=self._poll_telnet_messages)
-
-        text_renderer = TextRenderer()
-        cursor_renderer = CursorRenderer()
-        gate = ModalGate([self.connection_settings, self.display_settings, self.message_dialog])
-
+        self.gate = ModalGate([self.connection_settings, self.display_settings, self.message_dialog])
         self.app.add(GameWorld())
-        self.app.add(TextPane(text_renderer=text_renderer))
+        self.app.add(TextPane(text_renderer=TextRenderer()))
         self.app.add(Divider())
-        self.app.add(InputCommand(gate=gate, on_command=self.handle_command))
-        self.app.add(UIOverlay(menu_bar=self.menu_bar, message_dialog=self.message_dialog,
-                                        connection_settings=self.connection_settings, display_settings=self.display_settings))
-        self.app.add(Cursor(cursor_renderer=cursor_renderer))
+        self.app.add(InputCommand(gate=self.gate, on_command=self.handle_command))
+        self.app.add(UIOverlay(menu_bar=self.menu_bar, message_dialog=self.message_dialog, connection_settings=self.connection_settings,
+                               display_settings=self.display_settings))
+        self.app.add(Cursor(cursor_renderer=CursorRenderer()))
 
         self.log("Connected. Type 'help' and press Enter.")
         self.log("Left pane is your render surface; right pane is scrollback + clipboard.")
@@ -89,14 +65,12 @@ class MudClientUI:
         self.app.run()
 
     def _poll_telnet_messages(self) -> None:
-        """Poll for incoming telnet messages and display them"""
         if self._telnet and self._telnet.connected:
             line = self._telnet.poll_line()
             if line:
                 self.log(line)
 
     def _on_connection_established(self, connection_info: dict) -> None:
-        """Callback when ConnectionSettings successfully authenticates"""
         self._auth_data = connection_info["auth_data"]
         self._telnet_host = connection_info["telnet_host"]
         self._telnet_port = connection_info["telnet_port"]
@@ -155,11 +129,9 @@ class MudClientUI:
             self.scrollback.append(line)
 
     def handle_command(self, cmd: str) -> None:
-        self.log(f"> {cmd}")
-
+        self.log(f"{cmd}")
         parts = cmd.strip().split()
         if not parts:
-            # Empty command - just send to server if connected, or show blank line
             if self._telnet and self._telnet.connected:
                 try:
                     self._telnet.send_line("")
@@ -196,8 +168,6 @@ class MudClientUI:
                 return
 
             char_name = parts[1]
-
-            # Find character in auth data
             selected_char = None
             for char in self._auth_data.playerCharacterList:
                 if char.name.lower() == char_name.lower():
@@ -248,3 +218,22 @@ class MudClientUI:
             self._telnet.connect()
         return self._telnet
 
+    def _setup_menus(self) -> None:
+        file_menu = self.menu_bar.add_menu("File")
+        file_menu.add_item("Close", self.close_app)
+        settings_menu = self.menu_bar.add_menu("Settings")
+        settings_menu.add_item("Connections", self.show_connection_settings)
+        settings_menu.add_item("Display", self.show_display_settings)
+        pane_width = min(300, self.layout.w - 40)
+        pane_height = 300
+        pane_x = (self.layout.w - pane_width) // 2
+        pane_y = (self.layout.h - pane_height) // 2
+
+        self.message_dialog = MessageDialog()
+        self.connection_settings = ConnectionSettings(pane_x, pane_y, pane_width, pane_height, self.message_dialog,
+                                                      on_connect_callback=self._on_connection_established)
+
+        display_pane_height = min(380, self.layout.h - 20)
+        display_pane_y = max(10, (self.layout.h - display_pane_height) // 2)
+
+        self.display_settings = DisplaySettings(pane_x, display_pane_y, pane_width, display_pane_height, self.message_dialog, self)

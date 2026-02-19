@@ -1,12 +1,16 @@
 from dataclasses import dataclass
+from component.geometry.Shape import Shape, Drawable
 
 
 @dataclass
-class Rect:
+class Rect(Shape, Drawable):
     x: int
     y: int
     w: int
     h: int
+
+    def bounds(self) -> tuple[int, int, int, int]:
+        return (self.x, self.y, self.w, self.h)
 
     def contains(self, mx: int, my: int) -> bool:
         return self.x <= mx < self.x + self.w and self.y <= my < self.y + self.h
