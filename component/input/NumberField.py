@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional
 from component.geometry.Rect import Rect
 from component.input.KeySource import KeySource, PyxelKeySource
+import component.input.Keys as Keys
 from component.render.FieldRenderer import FieldRenderer, default_field_renderer
 
 
@@ -54,27 +55,25 @@ class NumberField:
         if not self.active:
             return
 
-        import pyxel  # only to access key constants; no pyxel calls
-
-        if self.keys.btnp(pyxel.KEY_LEFT, 18, 2):
+        if self.keys.btnp(Keys.KEY_LEFT, 18, 2):
             self.cursor = max(0, self.cursor - 1)
-        if self.keys.btnp(pyxel.KEY_RIGHT, 18, 2):
+        if self.keys.btnp(Keys.KEY_RIGHT, 18, 2):
             self.cursor = min(len(self.value), self.cursor + 1)
 
-        if self.keys.btnp(pyxel.KEY_BACKSPACE, 18, 2) and self.cursor > 0:
+        if self.keys.btnp(Keys.KEY_BACKSPACE, 18, 2) and self.cursor > 0:
             v = self.value
             c = self.cursor
             self.value = v[: c - 1] + v[c:]
             self.cursor = c - 1
 
-        if self.keys.btnp(pyxel.KEY_DELETE) and self.cursor < len(self.value):
+        if self.keys.btnp(Keys.KEY_DELETE) and self.cursor < len(self.value):
             v = self.value
             c = self.cursor
             self.value = v[:c] + v[c + 1 :]
 
         for i in range(10):
-            key = getattr(pyxel, f"KEY_{i}", None)
-            if key is not None and self.keys.btnp(key):
+            key = getattr(Keys, f"KEY_{i}")
+            if self.keys.btnp(key):
                 v = self.value
                 c = self.cursor
                 self.value = v[:c] + str(i) + v[c:]

@@ -6,6 +6,7 @@ from typing import Optional
 from component.geometry.Rect import Rect
 from component.render.TextField import TextField
 from component.input.KeySource import KeySource, PyxelKeySource
+import component.input.Keys as Keys
 
 
 @dataclass
@@ -80,23 +81,19 @@ class TextInputField:
         self._handle_insertion()
 
     def _handle_navigation(self) -> None:
-        import pyxel
-
-        if self.keys.btnp(pyxel.KEY_LEFT, 18, 2):
+        if self.keys.btnp(Keys.KEY_LEFT, 18, 2):
             self.model.cursor = max(0, self.model.cursor - 1)
-        if self.keys.btnp(pyxel.KEY_RIGHT, 18, 2):
+        if self.keys.btnp(Keys.KEY_RIGHT, 18, 2):
             self.model.cursor = min(len(self.model.value), self.model.cursor + 1)
 
     def _handle_deletion(self) -> None:
-        import pyxel
-
-        if self.keys.btnp(pyxel.KEY_BACKSPACE, 18, 2) and self.model.cursor > 0:
+        if self.keys.btnp(Keys.KEY_BACKSPACE, 18, 2) and self.model.cursor > 0:
             v = self.model.value
             c = self.model.cursor
             self.model.value = v[: c - 1] + v[c:]
             self.model.cursor = c - 1
 
-        if self.keys.btnp(pyxel.KEY_DELETE) and self.model.cursor < len(self.model.value):
+        if self.keys.btnp(Keys.KEY_DELETE) and self.model.cursor < len(self.model.value):
             v = self.model.value
             c = self.model.cursor
             self.model.value = v[:c] + v[c + 1 :]
@@ -105,32 +102,30 @@ class TextInputField:
         if len(self.model.value) >= self.max_len:
             return
 
-        import pyxel
-
-        shift = self.keys.btn(pyxel.KEY_SHIFT)
+        shift = self.keys.btn(Keys.KEY_SHIFT)
         for i in range(26):
-            key = getattr(pyxel, f"KEY_{chr(ord('A') + i)}", None)
-            if key is not None and self.keys.btnp(key):
+            key = getattr(Keys, f"KEY_{chr(ord('A') + i)}")
+            if self.keys.btnp(key):
                 ch = chr(ord("A") + i) if shift else chr(ord("a") + i)
                 self._insert(ch)
                 return
 
         for i in range(10):
-            key = getattr(pyxel, f"KEY_{i}", None)
-            if key is not None and self.keys.btnp(key):
+            key = getattr(Keys, f"KEY_{i}")
+            if self.keys.btnp(key):
                 self._insert(str(i))
                 return
 
         mapping = [
-            (getattr(pyxel, "KEY_PERIOD", None), "."),
-            (getattr(pyxel, "KEY_COLON", None), ":"),
-            (getattr(pyxel, "KEY_SLASH", None), "/"),
-            (getattr(pyxel, "KEY_MINUS", None), "-"),
-            (getattr(pyxel, "KEY_SPACE", None), " "),
-            (getattr(pyxel, "KEY_APOSTROPHE", None), "@" if shift else "'"),
+            (Keys.KEY_PERIOD, "."),
+            (Keys.KEY_COLON, ":"),
+            (Keys.KEY_SLASH, "/"),
+            (Keys.KEY_MINUS, "-"),
+            (Keys.KEY_SPACE, " "),
+            (Keys.KEY_APOSTROPHE, "@" if shift else "'"),
         ]
         for key, ch in mapping:
-            if key is not None and self.keys.btnp(key):
+            if self.keys.btnp(key):
                 self._insert(ch)
                 return
 

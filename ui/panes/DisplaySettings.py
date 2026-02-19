@@ -1,6 +1,6 @@
 from __future__ import annotations
 from component.button.Button import Button
-from component.field import NumberField
+from component.input import NumberField
 from component.geometry.Rect import Rect
 from component.modal.Dropdown import Dropdown
 from component.modal.ModalFrame import ModalFrame

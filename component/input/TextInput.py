@@ -2,13 +2,14 @@ from __future__ import annotations
 from collections import deque
 from typing import Optional
 from clipboard.Clipboard import Clipboard, default_clipboard
+import component.input.Keys as Keys
 
 import pyxel
 
 
 class TextInput:
     """
-    Minimal, robust-ish line editor for Pyxel.
+    Minimal, robust-ish line editor.
     - ASCII subset: letters, digits, space, basic punctuation
     - Backspace deletes
     - Enter submits
@@ -30,57 +31,45 @@ class TextInput:
 
         self.clipboard: Optional[Clipboard] = clipboard if clipboard is not None else default_clipboard()
 
-    def _k(self, name: str, default: int | None = None) -> int | None:
-        return getattr(pyxel, name, default)
-
     def _ctrl_down(self) -> bool:
-        k_lctrl = self._k("KEY_LCTRL")
-        k_rctrl = self._k("KEY_RCTRL")
-        return (k_lctrl is not None and pyxel.btn(k_lctrl)) or (k_rctrl is not None and pyxel.btn(k_rctrl))
+        return pyxel.btn(Keys.KEY_LCTRL) or pyxel.btn(Keys.KEY_RCTRL)
 
     def _consume_text(self) -> None:
         # Letters A-Z
         for i in range(26):
-            key = self._k(f"KEY_{chr(ord('A') + i)}")
-            if key is None:
-                continue
+            key = getattr(Keys, f"KEY_{chr(ord('A') + i)}")
             if pyxel.btnp(key):
                 ch = chr(ord("a") + i)
-                lshift = self._k("KEY_LSHIFT")
-                rshift = self._k("KEY_RSHIFT")
-                if (lshift is not None and pyxel.btn(lshift)) or (rshift is not None and pyxel.btn(rshift)):
+                if pyxel.btn(Keys.KEY_LSHIFT) or pyxel.btn(Keys.KEY_RSHIFT):
                     ch = ch.upper()
                 self.insert(ch)
 
         # Digits 0-9
         for i in range(10):
-            key = self._k(f"KEY_{i}")
-            if key is None:
-                continue
+            key = getattr(Keys, f"KEY_{i}")
             if pyxel.btnp(key):
                 self.insert(str(i))
 
         # Space
-        k_space = self._k("KEY_SPACE")
-        if k_space is not None and pyxel.btnp(k_space):
+        if pyxel.btnp(Keys.KEY_SPACE):
             self.insert(" ")
 
+        # Punctuation
         punct = [
-            ("KEY_MINUS", "-"),
-            ("KEY_EQUALS", "="),
-            ("KEY_LEFTBRACKET", "["),
-            ("KEY_RIGHTBRACKET", "]"),
-            ("KEY_BACKSLASH", "\\"),
-            ("KEY_SEMICOLON", ";"),
-            ("KEY_APOSTROPHE", "'"),
-            ("KEY_COMMA", ","),
-            ("KEY_PERIOD", "."),
-            ("KEY_SLASH", "/"),
-            ("KEY_GRAVE", "`"),
+            (Keys.KEY_MINUS, "-"),
+            (Keys.KEY_EQUALS, "="),
+            (Keys.KEY_LEFTBRACKET, "["),
+            (Keys.KEY_RIGHTBRACKET, "]"),
+            (Keys.KEY_BACKSLASH, "\\"),
+            (Keys.KEY_SEMICOLON, ";"),
+            (Keys.KEY_APOSTROPHE, "'"),
+            (Keys.KEY_COMMA, ","),
+            (Keys.KEY_PERIOD, "."),
+            (Keys.KEY_SLASH, "/"),
+            (Keys.KEY_GRAVE, "`"),
         ]
-        for kname, ch in punct:
-            key = self._k(kname)
-            if key is not None and pyxel.btnp(key):
+        for key, ch in punct:
+            if pyxel.btnp(key):
                 self.insert(ch)
 
     def insert(self, s: str) -> None:
@@ -202,50 +191,40 @@ class TextInput:
     def update(self) -> str | None:
         # --- clipboard / editor shortcuts ---
         if self._ctrl_down():
-            k_a = self._k("KEY_A")
-            k_c = self._k("KEY_C")
-            k_x = self._k("KEY_X")
-            k_v = self._k("KEY_V")
-
-            if k_a is not None and pyxel.btnp(k_a):
+            if pyxel.btnp(Keys.KEY_A):
                 self.select_all()
                 return None
 
-            if k_c is not None and pyxel.btnp(k_c):
+            if pyxel.btnp(Keys.KEY_C):
                 self._copy_selection()
                 return None
 
-            if k_x is not None and pyxel.btnp(k_x):
+            if pyxel.btnp(Keys.KEY_X):
                 self._cut_selection()
                 return None
 
-            if k_v is not None and pyxel.btnp(k_v):
+            if pyxel.btnp(Keys.KEY_V):
                 self._paste_clipboard()
                 return None
 
         # Cursor movement
-        k_left = self._k("KEY_LEFT")
-        k_right = self._k("KEY_RIGHT")
-        if k_left is not None and pyxel.btnp(k_left, 18, 2):
+        if pyxel.btnp(Keys.KEY_LEFT, 18, 2):
             self.clear_selection()
             self.move_cursor(-1)
-        if k_right is not None and pyxel.btnp(k_right, 18, 2):
+        if pyxel.btnp(Keys.KEY_RIGHT, 18, 2):
             self.clear_selection()
             self.move_cursor(+1)
 
         # History
-        k_up = self._k("KEY_UP")
-        k_down = self._k("KEY_DOWN")
-        if k_up is not None and pyxel.btnp(k_up):
+        if pyxel.btnp(Keys.KEY_UP):
             self.clear_selection()
             self.history_prev()
-        if k_down is not None and pyxel.btnp(k_down):
+        if pyxel.btnp(Keys.KEY_DOWN):
             self.clear_selection()
             self.history_next()
 
         # Backspace / Delete
-        k_bs = self._k("KEY_BACKSPACE") or self._k("KEY_DELETE")
-        if k_bs is not None and pyxel.btnp(k_bs, 18, 2):
+        if pyxel.btnp(Keys.KEY_BACKSPACE, 18, 2) or pyxel.btnp(Keys.KEY_DELETE, 18, 2):
             self.backspace()
 
         # Text entry
@@ -253,8 +232,7 @@ class TextInput:
         self._consume_text()
 
         # Submit
-        k_enter = self._k("KEY_RETURN") or self._k("KEY_ENTER")
-        if k_enter is not None and pyxel.btnp(k_enter):
+        if pyxel.btnp(Keys.KEY_RETURN) or pyxel.btnp(Keys.KEY_ENTER):
             cmd = self.buf.strip()
             self.set_buffer("")
             self.clear_selection()
