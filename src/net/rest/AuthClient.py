@@ -17,18 +17,21 @@ class AuthClient:
             "accountName": account_name,
             "password": password
         }
-
+        print(f"Sending login request to {self.auth_endpoint} with payload: {payload}")
         response = requests.post(self.auth_endpoint, json=payload)
+        print(f"Login response: {response.status_code} {response.text}")
         response.raise_for_status()
         data = response.json()
-        characters = [PlayerCharacter(**char) for char in data.get("playerCharacterList", [])]
+        print(f"Login data: {data}")
+        characters = [PlayerCharacter.from_dict(char, from_camel_case=True) for char in data.get("playerCharacterList", [])]
+        print(f"Characters: {characters}")
         self.auth_data = AuthResponse(id=data["id"], firstName=data["firstName"], lastName=data["lastName"],
                                       accountName=data["accountName"], emailAddress=data["emailAddress"],
                                       password=data["password"], playerCharacterList=characters)
 
         if "Authorization" in response.headers:
             self.jwt_token = response.headers["Authorization"]
-
+        print(f"Returning auth data: {self.auth_data}")
         return self.auth_data
 
     def get_auth_headers(self) -> Dict[str, str]:

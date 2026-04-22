@@ -15,7 +15,7 @@ import os
 
 
 class ConnectionSettings:
-    def __init__(self, x: int, y: int, width: int, height: int, message_dialog, on_connect_callback=None):
+    def __init__(self, x: int, y: int, width: int, height: int, message_dialog, on_connect_callback=None, install_dir: str = None):
         self.x = x
         self.y = y
         self.width = width
@@ -23,6 +23,7 @@ class ConnectionSettings:
         self.visible = False
         self.message_dialog: MessageDialog = message_dialog
         self.on_connect_callback = on_connect_callback
+        self.install_dir = install_dir  # Installation directory for storing connections.json
         self.status_message = ""
         self.status_color = 7
         self.password_visible = False
@@ -80,6 +81,7 @@ class ConnectionSettings:
         # --- models (add telnet models) ---
         self.m_name = TextInputModel(value="", cursor=0, active=False)
         self.m_server = TextInputModel(value="http://localhost:8169", cursor=0, active=False)
+        self.m_api_port = TextInputModel(value="9080", cursor=0, active=False)
         self.m_account = TextInputModel(value="", cursor=0, active=False)
         self.m_pass = TextInputModel(value="", cursor=0, active=False)
         self.m_tn_host = TextInputModel(value="localhost", cursor=0, active=False)
@@ -90,10 +92,11 @@ class ConnectionSettings:
 
         y_name = fields_top + 0 * row_gap
         y_server = fields_top + 2 * row_gap
-        y_acct = fields_top + 4 * row_gap
-        y_pass = fields_top + 6 * row_gap
-        y_tnhost = fields_top + 8 * row_gap
-        y_tnport = fields_top + 10 * row_gap
+        y_api_port = fields_top + 4 * row_gap
+        y_acct = fields_top + 6 * row_gap
+        y_pass = fields_top + 8 * row_gap
+        y_tnhost = fields_top + 10 * row_gap
+        y_tnport = fields_top + 12 * row_gap
 
         # move telnet rows up if we’d collide with status/buttons
         last_field_bottom = (y_tnport + label_to_field + field_h)
@@ -101,20 +104,23 @@ class ConnectionSettings:
         if last_field_bottom > max_bottom:
             # compress spacing to fit
             available = max(1, max_bottom - fields_top)
-            steps = 10  # index of last row
+            steps = 12  # index of last row
             row_gap = max(14, available // steps)
             y_name = fields_top + 0 * row_gap
             y_server = fields_top + 2 * row_gap
-            y_acct = fields_top + 4 * row_gap
-            y_pass = fields_top + 6 * row_gap
-            y_tnhost = fields_top + 8 * row_gap
-            y_tnport = fields_top + 10 * row_gap
+            y_api_port = fields_top + 4 * row_gap
+            y_acct = fields_top + 6 * row_gap
+            y_pass = fields_top + 8 * row_gap
+            y_tnhost = fields_top + 10 * row_gap
+            y_tnport = fields_top + 12 * row_gap
 
         # --- widgets ---
         self.in_name = TextInputField(Rect(form_x + pad, y_name + label_to_field, fw, field_h),
                                       self.m_name, max_len=50, text_field=self.tf)
         self.in_server = TextInputField(Rect(form_x + pad, y_server + label_to_field, fw, field_h),
                                         self.m_server, max_len=100, text_field=self.tf)
+        self.api_port = TextInputField(Rect(form_x + pad, y_api_port + label_to_field, 60, field_h),
+                                       self.m_api_port, max_len=5, text_field=self.tf)
         self.in_account = TextInputField(Rect(form_x + pad, y_acct + label_to_field, fw, field_h),
                                          self.m_account, max_len=50, text_field=self.tf)
         self.in_pass = TextInputField(Rect(form_x + pad, y_pass + label_to_field, fw - 120, field_h),
@@ -149,6 +155,7 @@ class ConnectionSettings:
         self._label_y = {
             "name": y_name,
             "server": y_server,
+            "api_port": y_api_port,
             "account": y_acct,
             "pass": y_pass,
             "tn_host": y_tnhost,
@@ -158,7 +165,7 @@ class ConnectionSettings:
         self._status_y = status_y
 
     def _blur_all_fields(self) -> None:
-        for f in (self.in_name, self.in_server, self.in_account, self.in_pass, self.tn_host, self.tn_port):
+        for f in (self.in_name, self.in_server, self.api_port, self.in_account, self.in_pass, self.tn_host, self.tn_port):
             f.blur()
 
     def _toggle_password_visibility(self) -> None:
@@ -172,6 +179,9 @@ class ConnectionSettings:
 
         self.m_server.value = "http://localhost:8169"
         self.m_server.cursor = len(self.m_server.value)
+
+        self.m_api_port.value = "9080"
+        self.m_api_port.cursor = len(self.m_api_port.value)
 
         self.m_account.value = ""
         self.m_account.cursor = 0
@@ -199,9 +209,14 @@ class ConnectionSettings:
         except Exception:
             return ""
 
-    @staticmethod
-    def _get_connections_path() -> str:
-        resources_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "resources")
+    def _get_connections_path(self) -> str:
+        """Get the path to connections.json in the installation directory."""
+        if self.install_dir:
+            resources_dir = os.path.join(self.install_dir, "resources")
+        else:
+            # Fallback to old behavior if install_dir not set
+            resources_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "resources")
+
         os.makedirs(resources_dir, exist_ok=True)
         return os.path.join(resources_dir, "connections.json")
 
@@ -234,6 +249,9 @@ class ConnectionSettings:
             self.m_server.value = conn.get("server_url", "http://localhost:8169")
             self.m_server.cursor = len(self.m_server.value)
 
+            self.m_api_port.value = conn.get("api_port", "9080")
+            self.m_api_port.cursor = len(self.m_api_port.value)
+
             self.m_account.value = conn.get("account_name", "")
             self.m_account.cursor = len(self.m_account.value)
 
@@ -260,6 +278,7 @@ class ConnectionSettings:
         connection = {
             "name": name,
             "server_url": self.m_server.value.strip(),
+            "api_port": self.m_api_port.value.strip(),
             "account_name": self.m_account.value.strip(),
             "password": self._obfuscate_password(self.m_pass.value),
             "telnet_host": self.m_tn_host.value.strip(),
@@ -288,10 +307,10 @@ class ConnectionSettings:
 
         try:
             server = self.m_server.value.strip()
+            api_port = int(self.m_api_port.value.strip())
             self.auth_client.base_url = server
             self.auth_client.auth_endpoint = f"{server}/api/auth/login"
             result = self.auth_client.login(account, password)
-
             self.status_message = f"Connected as {result.accountName}"
             self.status_color = 11
 
@@ -302,11 +321,14 @@ class ConnectionSettings:
             if self.on_connect_callback:
                 connection_info = {
                     "auth_data": result,
+                    "server_url": server,
+                    "api_port": api_port,
                     "telnet_host": self.m_tn_host.value.strip(),
                     "telnet_port": int(self.m_tn_port.value.strip())
                 }
+                print(f"Before calling callback: {connection_info}")
                 self.on_connect_callback(connection_info)
-
+                print(f"After calling callback: {connection_info}")
             # Hide the settings panel after successful connection
             self.hide()
 
@@ -336,7 +358,7 @@ class ConnectionSettings:
             self._load_connection(idx)
             self._blur_all_fields()
 
-        for f in (self.in_name, self.in_server, self.in_account, self.in_pass, self.tn_host, self.tn_port):
+        for f in (self.in_name, self.in_server, self.api_port, self.in_account, self.in_pass, self.tn_host, self.tn_port):
             f.update(ctx)
 
         self.btn_toggle_pass.update(ctx)
@@ -361,6 +383,9 @@ class ConnectionSettings:
 
         self.tf.draw_text(ctx, x=lx, y=y["server"], text="Authentication Server URL:", col=7)
         self.in_server.draw(ctx)
+
+        self.tf.draw_text(ctx, x=lx, y=y["api_port"], text="API Port:", col=7)
+        self.api_port.draw(ctx)
 
         self.tf.draw_text(ctx, x=lx, y=y["account"], text="Account Name:", col=7)
         self.in_account.draw(ctx)

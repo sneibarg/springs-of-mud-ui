@@ -1,10 +1,10 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
-clipboard/__pycache__
-net/rest/__pycache__
-ui/panes/__pycache__
-ui/layout/__pycache__
-domain/__pycache__
+src/clipboard/__pycache__
+src/net/rest/__pycache__
+src/ui/panes/__pycache__
+src/ui/layout/__pycache__
+src/domain/__pycache__
 *.py[cod]
 *$py.class
 

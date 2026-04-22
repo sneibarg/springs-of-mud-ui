@@ -11,7 +11,7 @@ import os
 
 
 class DisplaySettings:
-    def __init__(self, x: int, y: int, width: int, height: int, message_dialog=None, mud_client_ui=None):
+    def __init__(self, x: int, y: int, width: int, height: int, message_dialog=None, mud_client_ui=None, install_dir: str = None):
         self.x = x
         self.y = y
         self.width = width
@@ -20,6 +20,7 @@ class DisplaySettings:
 
         self.message_dialog = message_dialog
         self.mud_client_ui = mud_client_ui
+        self.install_dir = install_dir  # Installation directory for storing display_settings.json
 
         self.status_message = ""
         self.status_color = 7
@@ -88,9 +89,14 @@ class DisplaySettings:
         for f in (self.f_chars, self.f_lines, self.f_window_h, self.f_scroll, self.f_game_w, self.f_text_w):
             f.blur()
 
-    @staticmethod
-    def _get_settings_path() -> str:
-        resources_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "resources")
+    def _get_settings_path(self) -> str:
+        """Get the path to display_settings.json in the installation directory."""
+        if self.install_dir:
+            resources_dir = os.path.join(self.install_dir, "resources")
+        else:
+            # Fallback to old behavior if install_dir not set
+            resources_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "resources")
+
         os.makedirs(resources_dir, exist_ok=True)
         return os.path.join(resources_dir, "display_settings.json")
 

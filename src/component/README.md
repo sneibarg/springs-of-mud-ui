@@ -54,11 +54,14 @@ component/
 All drawing is done through the `Graphics` protocol:
 
 ```python
-from component.render.api.Graphics import Graphics
+from component import Graphics
+
 
 class Graphics(Protocol):
     def cls(self, col: int) -> None: ...
+
     def rect(self, x: int, y: int, w: int, h: int, col: int) -> None: ...
+
     def text(self, x: int, y: int, s: str, col: int) -> None: ...
     # ... more methods
 ```
@@ -76,17 +79,20 @@ def draw(self, ctx):
 Keyboard input is handled through the `KeySource` protocol:
 
 ```python
-from component.input.KeySource import KeySource
+from component import KeySource
+
 
 class KeySource(Protocol):
     def btnp(self, key: int, hold: int = 0, period: int = 0) -> bool: ...
+
     def btn(self, key: int) -> bool: ...
 ```
 
 Use with key constants:
 
 ```python
-import component.input.Keys as Keys
+
+import component as Keys
 
 if self.keys.btnp(Keys.KEY_RETURN):
     # Handle Enter key press
@@ -98,11 +104,14 @@ if self.keys.btnp(Keys.KEY_RETURN):
 Mouse input through the `MouseSource` protocol:
 
 ```python
-from component.input.MouseSource import MouseSource
+from component import MouseSource
+
 
 class MouseSource(Protocol):
     def get_position(self) -> tuple[int, int]: ...
+
     def is_button_pressed(self, button: int) -> bool: ...
+
     def get_wheel_delta(self) -> int: ...
 ```
 
@@ -111,7 +120,8 @@ class MouseSource(Protocol):
 #### Key Constants (`component.input.Keys`)
 
 ```python
-import component.input.Keys as Keys
+
+import component as Keys
 
 # Letter keys
 Keys.KEY_A, Keys.KEY_B, ...
@@ -132,7 +142,7 @@ Keys.MOUSE_BUTTON_LEFT, Keys.MOUSE_BUTTON_RIGHT
 #### Color Constants (`component.render.Colors`)
 
 ```python
-from component.render import Colors
+from component import Colors
 
 # Standard 16-color palette
 Colors.COLOR_BLACK, Colors.COLOR_WHITE, Colors.COLOR_RED, ...
@@ -149,8 +159,9 @@ Colors.COLOR_SUCCESS, Colors.COLOR_ERROR, Colors.COLOR_WARNING
 ```python
 from __future__ import annotations
 from dataclasses import dataclass
-from component.geometry.Rect import Rect
+from component.geometry import Rect
 from component.render import Colors
+
 
 @dataclass
 class MyComponent:
@@ -173,8 +184,9 @@ class MyComponent:
 ### Component with Keyboard Input
 
 ```python
-from component.input.KeySource import KeySource, PyxelKeySource
-import component.input.Keys as Keys
+from component import KeySource, PyxelKeySource
+import component as Keys
+
 
 class InputComponent:
     def __init__(self, keys: KeySource | None = None):
@@ -192,8 +204,9 @@ Use mock implementations for testing:
 
 ```python
 from tests.mocks import MockGraphics, MockKeySource
-from component.button.Button import Button
-from component.geometry.Rect import Rect
+from component import Button
+from component.geometry import Rect
+
 
 def test_button():
     # Create mocks
@@ -202,6 +215,7 @@ def test_button():
 
     # Create component
     clicked = False
+
     def on_click():
         nonlocal clicked
         clicked = True
@@ -212,6 +226,7 @@ def test_button():
     class MockContext:
         class input:
             mx, my, click = 25, 20, True
+
         gfx = gfx
 
     # Test
@@ -235,8 +250,9 @@ Example with Pygame:
 
 ```python
 # your_engine/PygameGfx.py
-from component.render.api.Graphics import Graphics
+from component import Graphics
 import pygame
+
 
 class PygameGfx(Graphics):
     def __init__(self, surface):
