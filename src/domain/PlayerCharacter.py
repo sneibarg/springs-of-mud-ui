@@ -37,10 +37,10 @@ class PlayerCharacter:
     cloaked: bool = False
     guild: str = ""
     sex: str = "male"
-    character_class: Dict[str, Any] = field(default_factory=dict)
     room_id: str = ""
     area_id: str = ""
     role: str = "player"
+    character_class: Dict[str, Any] = field(default_factory=dict)
     character_flags: Dict[str, Any] = field(default_factory=dict)
     armor_class: Dict[str, Any] = field(default_factory=dict)
     character_attributes: Dict[str, Any] = field(default_factory=dict)
@@ -66,9 +66,6 @@ class PlayerCharacter:
     trust: int = 0
     invis_level: int = 0
     incog_level: int = 0
-    train: int = 0
-    practice: int = 0
-    points: int = 0
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], from_camel_case: bool = True) -> "PlayerCharacter":
@@ -83,7 +80,17 @@ class PlayerCharacter:
 
     def to_dict(self, to_camel_case: bool = True) -> Dict[str, Any]:
         payload = dict(self.__dict__)
-        return _convert_keys(payload, _snake_to_camel) if to_camel_case else payload
+        if not to_camel_case:
+            return payload
+
+        converted: Dict[str, Any] = {}
+        for key, value in payload.items():
+            out_key = _snake_to_camel(key)
+            if key == "prompt_format" and isinstance(value, dict):
+                converted[out_key] = dict(value)
+            else:
+                converted[out_key] = _convert_keys(value, _snake_to_camel)
+        return converted
 
     def to_json(self, to_camel_case: bool = True) -> str:
         return json.dumps(self.to_dict(to_camel_case=to_camel_case))

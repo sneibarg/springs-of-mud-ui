@@ -340,20 +340,32 @@ class CharacterCreation:
             "wimpy": 0,
             "trains": 3 + int(self.state.get("trainBonus", 0)),
             "practices": 5,
+            "points": int(self.state.get("points", 0)),
+            "experience": 0,
+            "accumulated_experience": 0,
+            "experience_per_level": int(self.state.get("expPerLevel", 1000)),
         }
         character_class = {
-            "name": self.state["characterClass"],
+            "name": self._presented_class_name(class_meta, self.state["characterClass"]),
             "attr_prime": 0,
             "weapon": 0,
             "guild": 0,
             "skill_adept": int(class_meta.get("skillAdept", class_meta.get("skill_adept", 75))),
-            "thac0_00": int(class_meta.get("thac0_00", 20)),
-            "thac0_32": int(class_meta.get("thac0_32", 0)),
+            "thac000": int(class_meta.get("thac000", 20)),
+            "thac032": int(class_meta.get("thac032", 0)),
             "hp_min": int(class_meta.get("hpMin", class_meta.get("hp_min", 8))),
             "hp_max": int(class_meta.get("hpMax", class_meta.get("hp_max", 12))),
             "mana_gain": bool(class_meta.get("fMana", class_meta.get("mana_gain", False))),
-            "base_group": class_meta.get("baseGroup", class_meta.get("base_group", f"{self.state['characterClass'].lower()} basics")),
-            "default_group": class_meta.get("defaultGroup", class_meta.get("default_group", f"{self.state['characterClass'].lower()} default")),
+            "base_group": self._non_blank_value(
+                class_meta.get("baseGroup"),
+                class_meta.get("base_group"),
+                f"{self.state['characterClass'].lower()} basics",
+            ),
+            "default_group": self._non_blank_value(
+                class_meta.get("defaultGroup"),
+                class_meta.get("default_group"),
+                f"{self.state['characterClass'].lower()} default",
+            ),
         }
         prompt_format = {
             "hp": True, "max_hp": False, "mana": True, "max_mana": False,
@@ -372,20 +384,20 @@ class CharacterCreation:
             cloaked=False,
             guild="",
             sex=self.state["sex"],
-            character_class=json.dumps(character_class),
+            character_class=character_class,
             room_id=room_id or "",
             area_id=area_id or "",
             role="player",
-            character_flags=json.dumps({"act": "", "comm": "", "affectedBy": ""}),
-            armor_class=json.dumps({"piercing": 100, "slashing": 100, "bashing": 100, "magic": 100}),
-            character_attributes=json.dumps(character_attributes),
-            temporal_mechanics=json.dumps({"played": 0, "logon": 0, "pulseWait": 0, "pulseDaze": 0}),
-            equipped=json.dumps(equipped),
+            character_flags={"act": "", "comm": "", "affectedBy": ""},
+            armor_class={"piercing": 100, "slashing": 100, "bashing": 100, "magic": 100},
+            character_attributes=character_attributes,
+            temporal_mechanics={"played": 0, "logon": 0, "pulseWait": 0, "pulseDaze": 0},
+            equipped=equipped,
             prompt_format=prompt_format,
-            inventory=inventory,
+            inventory=[],
             effects=[],
-            skills=list(self.state.get("selectedSkills", [])),
-            spells=list(self.state.get("selectedSpells", [])),
+            skills=self._named_entries(self.state.get("selectedSkills", [])),
+            spells=self._named_entries(self.state.get("selectedSpells", [])),
             hit=100,
             max_hit=100,
             mana=100,
@@ -393,51 +405,39 @@ class CharacterCreation:
             movement=100,
             max_movement=100,
             level=1,
-            experience=0,
-            accumulated_experience=0,
-            experience_per_level=int(self.state.get("expPerLevel", 1000)),
             gold=0,
             silver=0,
             trust=0,
             invis_level=0,
             incog_level=0,
-            train=3 + int(self.state.get("trainBonus", 0)),
-            practice=5,
-            points=int(self.state.get("points", 0)),
         )
 
     def build_payload_dict(self) -> dict | None:
         pc = self.build_player_character()
         if pc is None:
             return None
-        return json.loads(pc.to_json())
+        payload = json.loads(pc.to_json())
+        payload.pop("experience", None)
+        payload.pop("accumulatedExperience", None)
+        payload.pop("experiencePerLevel", None)
+        return payload
 
-    def _starter_equipment(self) -> tuple[dict[str, dict], list[dict]]:
+    def _starter_equipment(self) -> dict[str, dict]:
         equipped: dict[str, dict] = {}
-        inventory: list[str] = []
-
         banner = self._starter_item_from_constant("OBJ_VNUM_SCHOOL_BANNER", zero_cost=True)
-        if banner:
-            equipped["light"] = json.dumps(banner)
-            inventory.append(json.dumps(banner))
-
         vest = self._starter_item_from_constant("OBJ_VNUM_SCHOOL_VEST", zero_cost=True)
-        if vest:
-            equipped["torso"] = json.dumps(vest)
-            inventory.append(json.dumps(banner))
-
         weapon = self._starter_weapon_item()
-        if weapon:
-            equipped["wielded"] = json.dumps(weapon)
-            inventory.append(json.dumps(banner))
+        if banner and vest and weapon:
+            equipped["light"] = banner
+            equipped["torso"] = vest
+            equipped["wielded"] = weapon
 
         if not self._is_two_handed_item(weapon):
             shield = self._starter_item_from_constant("OBJ_VNUM_SCHOOL_SHIELD", zero_cost=True)
             if shield:
-                equipped["shield"] = json.dumps(shield)
-                inventory.append(json.dumps(banner))
+                equipped["shield"] = shield
 
-        return equipped, inventory
+        return equipped
 
     def _starter_weapon_item(self) -> dict | None:
         weapon_name = str((self.state or {}).get("weapon") or "").strip().lower()
@@ -572,6 +572,36 @@ class CharacterCreation:
             if isinstance(letter_value, str) and letter_value.strip().isdigit() and int(letter_value.strip()) == value:
                 return str(letter)
         return None
+
+    @staticmethod
+    def _non_blank_value(*values: Any) -> Any:
+        for value in values:
+            if isinstance(value, str):
+                if value.strip():
+                    return value
+                continue
+            if value is not None:
+                return value
+        return ""
+
+    @staticmethod
+    def _presented_class_name(class_meta: dict, fallback_name: str) -> str:
+        raw_name = class_meta.get("name") if isinstance(class_meta, dict) else None
+        if isinstance(raw_name, str) and raw_name.strip():
+            return raw_name.strip()
+        return str(fallback_name or "").strip().title()
+
+    def _named_entries(self, names: list[str] | None) -> list[dict[str, object]]:
+        entries: list[dict[str, object]] = []
+        for name in names or []:
+            normalized = str(name or "").strip()
+            if normalized and normalized == "recall":
+                entries.append({"name": normalized, "level": 50})
+            elif normalized and normalized in self.ROM_WEAPONS:
+                entries.append({"name": normalized, "level": 40})
+            else:
+                entries.append({"name": normalized, "level": 1})
+        return entries
 
     def _creation_points_lines(self) -> list[str]:
         return [

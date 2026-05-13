@@ -39,10 +39,15 @@ class MudClientUI:
         self._character_creation: CharacterCreation | None = None
         self.text_font_name = None
         self.layout = Layout()
+        self._show_graphics = True
+        self._configured_gutter = self.layout.gutter
+        self._toggle_graphics_menu_item = None
         # Create DisplaySettings with install_dir so it can load from the correct location
         self.settings = DisplaySettings(0, 0, 100, 100, None, None, install_dir=self.install_dir)
-        self.layout.game_w = int(self.settings.game_pane_width)
-        self.layout.ui_w = int(self.settings.text_pane_width)
+        self._configured_game_w = int(self.settings.game_pane_width)
+        self._configured_ui_w = int(self.settings.text_pane_width)
+        self.layout.game_w = self._configured_game_w
+        self.layout.ui_w = self._configured_ui_w
         self.layout.h = int(self.settings.window_height)
         self.layout.game_h = int(self.settings.window_height)
         self.text_input = TextInput(max_len=2000)
@@ -65,13 +70,7 @@ class MudClientUI:
                                 font_scale=self.font_scale,
                                 poll_callback=self._poll_telnet_messages)
         self.gate = ModalGate([self.connection_settings, self.display_settings, self.message_dialog])
-        self.app.add(GameWorld())
-        self.app.add(TextPane(text_renderer=TextRenderer()))
-        self.app.add(Divider())
-        self.app.add(InputCommand(gate=self.gate, on_command=self.handle_command))
-        self.app.add(UIOverlay(menu_bar=self.menu_bar, message_dialog=self.message_dialog, connection_settings=self.connection_settings,
-                               display_settings=self.display_settings))
-        self.app.add(Cursor(cursor_renderer=CursorRenderer()))
+        self._mount_components()
 
         self.log("Connected. Type 'help' and press Enter.")
         self.log("Left pane is your render surface; right pane is scrollback + clipboard.")
@@ -84,7 +83,7 @@ class MudClientUI:
     def _poll_telnet_messages(self) -> None:
         if self._telnet and self._telnet.connected:
             line = self._telnet.poll_line()
-            if line:
+            if line is not None:
                 self.log(line)
 
     def _on_connection_established(self, connection_info: dict) -> None:
@@ -98,6 +97,7 @@ class MudClientUI:
         )
         print(f"API_base_url: {self._api_base_url}")
         self._character_creation = CharacterCreation(api_base_url=self._api_base_url, account_id=self._auth_data.id)
+        self._refresh_player_character_list()
 
         self.log(f"Authenticated as {self._auth_data.firstName} {self._auth_data.lastName}")
         self.log(f"Telnet server: {self._telnet_host}:{self._telnet_port}")
@@ -152,14 +152,15 @@ class MudClientUI:
             # requires restart for pyxel.init resize; keep your “restart for full effect” message
 
         if game_pane_width:
-            self.layout.game_w = game_pane_width
+            self._configured_game_w = game_pane_width
 
         if text_pane_width:
-            self.layout.ui_w = text_pane_width
+            self._configured_ui_w = text_pane_width
 
         if font_name:
             self.text_font_name = font_name
 
+        self._refresh_render_mode_layout()
         self.app.set_text_metrics(visible_lines=self.visible_lines, line_spacing=self.line_spacing, font_scale=self.font_scale)
         self.log(f"Settings applied: {chars_per_line} chars/line, game_w={game_pane_width}px, text_w={text_pane_width}px")
 
@@ -194,14 +195,20 @@ class MudClientUI:
 
         verb = parts[0].lower()
         if verb == "ui-help":
-            self.log("Commands: ui-help, list, logon <name>, create-char <...>, close-ui")
+            self.log("Commands: ui-help, list-connections, connect <name>, list, logon <name>, create-char <...>, close-ui")
             self.log("Use Settings -> Connections to authenticate first")
+            return
+        if verb == "list-connections":
+            self._handle_list_connections_command()
+            return
+        if verb == "connect":
+            self._handle_connect_command(parts[1:])
             return
         if verb == "create-char":
             self._handle_create_character_command(parts[1:])
             return
 
-        if verb == "list":
+        if verb == "ui-list":
             if not self._auth_data:
                 self.log("Please authenticate first via Settings -> Connections")
                 return
@@ -273,12 +280,39 @@ class MudClientUI:
         for line in self._character_creation.help_lines():
             self.log(line)
 
+    def _handle_list_connections_command(self) -> None:
+        connections = self.connection_settings.list_saved_connections()
+        if not connections:
+            self.log("No saved connections found.")
+            return
+
+        self.log("Saved connections:")
+        for connection in connections:
+            name = str(connection.get("name", "Unnamed")).strip() or "Unnamed"
+            server_url = str(connection.get("server_url", "")).strip()
+            api_port = str(connection.get("api_port", "")).strip()
+            telnet_host = str(connection.get("telnet_host", "")).strip()
+            telnet_port = str(connection.get("telnet_port", "")).strip()
+            self.log(f"- {name} | auth={server_url}:{api_port} | telnet={telnet_host}:{telnet_port}")
+
+    def _handle_connect_command(self, args: list[str]) -> None:
+        if not args:
+            self.log("Usage: connect <connection-name>")
+            return
+
+        connection_name = " ".join(args).strip()
+        try:
+            self.connection_settings.connect_saved_connection(connection_name)
+            self.log(f"Connected using saved connection '{connection_name}'.")
+        except Exception as e:
+            self.log(f"Connect failed: {e}")
+
     def _handle_create_character_command(self, args: list[str]) -> None:
         if not self._auth_data:
             self.log("Please authenticate first via Settings -> Connections")
             return
         if not self._character_creation:
-            self._character_creation = CharacterCreation(fetch_json=self._fetch_json, account_id=self._auth_data.id)
+            self._character_creation = CharacterCreation(api_base_url=self._api_base_url, account_id=self._auth_data.id)
 
         action = args[0].lower() if args else "help"
         if action == "help":
@@ -297,9 +331,13 @@ class MudClientUI:
             if character is None:
                 self.log("Character creation is not complete yet.")
                 return
+            payload = self._character_creation.build_payload_dict()
+            if payload is None:
+                self.log("Character creation payload could not be built.")
+                return
             self.log("Character creation payload:")
-            self.log(character.to_json())
-            self._submit_character_payload(character)
+            self.log(json.dumps(payload))
+            self._submit_character_payload(payload)
             return
         if action == "start":
             for line in self._character_creation.start():
@@ -331,13 +369,14 @@ class MudClientUI:
             return response.json()
         return None
 
-    def _submit_character_payload(self, payload: PlayerCharacter) -> None:
-        payload_json = payload.to_json()
+    def _submit_character_payload(self, payload: PlayerCharacter | dict) -> None:
+        payload_json = payload.to_json() if isinstance(payload, PlayerCharacter) else json.dumps(payload)
         try:
             result = self._post_json(self.ENDPOINTS["characters"], payload_json)
+            self._refresh_player_character_list()
             self.log("Character creation request submitted.")
             if isinstance(result, dict):
-                name = result.get("name", payload.name)
+                name = result.get("name", payload.name if isinstance(payload, PlayerCharacter) else payload.get("name", ""))
                 self.log(f"Created character: {name}")
             self.log("Use 'list' after reconnect/auth refresh if your new character is not yet shown.")
         except requests.HTTPError as e:
@@ -355,6 +394,20 @@ class MudClientUI:
             self.log(f"Character creation submit failed: {e}")
             print(f"Payload for failed request: {payload_json}")
 
+    def _refresh_player_character_list(self) -> None:
+        if not self._auth_data:
+            return
+        try:
+            characters = self._fetch_json(f"/characters/account/{self._auth_data.id}")
+            if isinstance(characters, list):
+                self._auth_data.playerCharacterList = [
+                    PlayerCharacter.from_dict(character, from_camel_case=True)
+                    for character in characters
+                    if isinstance(character, dict)
+                ]
+        except Exception as e:
+            self.log(f"Unable to refresh character list from API: {e}")
+
     def _ensure_telnet(self) -> TelnetClient:
         if self._telnet is None:
             self._telnet = TelnetClient(TelnetConfig(host=self._telnet_host, port=self._telnet_port), on_status=self.log)
@@ -362,8 +415,60 @@ class MudClientUI:
             self._telnet.connect()
         return self._telnet
 
+    def toggle_graphics(self) -> None:
+        self._show_graphics = not self._show_graphics
+        self._refresh_render_mode_layout()
+        self._mount_components()
+        self._update_graphics_menu_item_label()
+
+        if self._show_graphics:
+            self.log("Graphics enabled. Game board restored.")
+        else:
+            self.log("Graphics disabled. Telnet client is now the only rendered pane.")
+
+    def _refresh_render_mode_layout(self) -> None:
+        total_width = self._configured_game_w + self._configured_ui_w + self._configured_gutter
+
+        if self._show_graphics:
+            self.layout.game_w = self._configured_game_w
+            self.layout.ui_w = self._configured_ui_w
+            self.layout.gutter = self._configured_gutter
+        else:
+            self.layout.game_w = 0
+            self.layout.ui_w = total_width
+            self.layout.gutter = 0
+
+        self.menu_bar.width = self.layout.w
+
+    def _mount_components(self) -> None:
+        self.app.clear_components()
+
+        if self._show_graphics:
+            self.app.add(GameWorld())
+
+        self.app.add(TextPane(text_renderer=TextRenderer()))
+
+        if self._show_graphics:
+            self.app.add(Divider())
+
+        self.app.add(InputCommand(gate=self.gate, on_command=self.handle_command))
+        self.app.add(UIOverlay(
+            menu_bar=self.menu_bar,
+            message_dialog=self.message_dialog,
+            connection_settings=self.connection_settings,
+            display_settings=self.display_settings,
+        ))
+        self.app.add(Cursor(cursor_renderer=CursorRenderer()))
+
+    def _update_graphics_menu_item_label(self) -> None:
+        if self._toggle_graphics_menu_item is None:
+            return
+        self._toggle_graphics_menu_item.label = "Hide Graphics" if self._show_graphics else "Show Graphics"
+
     def _setup_menus(self) -> None:
         file_menu = self.menu_bar.add_menu("File")
+        file_menu.add_item("Hide Graphics", self.toggle_graphics)
+        self._toggle_graphics_menu_item = file_menu.items[-1]
         file_menu.add_item("Close", self.close_app)
         settings_menu = self.menu_bar.add_menu("Settings")
         settings_menu.add_item("Connections", self.show_connection_settings)

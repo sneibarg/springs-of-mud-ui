@@ -56,6 +56,9 @@ class MudClientApp:
         self._components.append(c)
         self._components.sort(key=lambda x: getattr(x, "z_index", 0))
 
+    def clear_components(self) -> None:
+        self._components.clear()
+
     def set_text_metrics(self, *, visible_lines: int, line_spacing: int, font_scale: int) -> None:
         self.visible_lines = visible_lines
         self.line_spacing = line_spacing

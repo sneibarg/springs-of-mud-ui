@@ -230,6 +230,10 @@ class ConnectionSettings:
             print(f"Failed to load connections: {e}")
             self.saved_connections = []
 
+    def list_saved_connections(self) -> List[Dict]:
+        self._load_connections()
+        return list(self.saved_connections)
+
     def _save_connections(self) -> None:
         try:
             path = self._get_connections_path()
@@ -298,44 +302,58 @@ class ConnectionSettings:
     def _handle_connect(self) -> None:
         # ctx is set by update()
         ctx = self._ctx
-
-        account = self.m_account.value.strip()
-        password = self.m_pass.value
-        if not account or not password:
-            self.message_dialog.show(ctx,"Connection Error", "Please enter account name and password")
-            return
-
         try:
-            server = self.m_server.value.strip()
-            api_port = int(self.m_api_port.value.strip())
-            self.auth_client.base_url = server
-            self.auth_client.auth_endpoint = f"{server}/api/auth/login"
-            result = self.auth_client.login(account, password)
-            self.status_message = f"Connected as {result.accountName}"
-            self.status_color = 11
-
-            if ctx is not None and result.playerCharacterList:
-                ctx.set_character_list(result.playerCharacterList)
-
-            # Call the callback with auth data and connection info
-            if self.on_connect_callback:
-                connection_info = {
-                    "auth_data": result,
-                    "server_url": server,
-                    "api_port": api_port,
-                    "telnet_host": self.m_tn_host.value.strip(),
-                    "telnet_port": int(self.m_tn_port.value.strip())
-                }
-                print(f"Before calling callback: {connection_info}")
-                self.on_connect_callback(connection_info)
-                print(f"After calling callback: {connection_info}")
-            # Hide the settings panel after successful connection
+            self.connect_current_fields(ctx=ctx)
             self.hide()
-
         except Exception as e:
             self.message_dialog.show(ctx, "Connection Failed", f"Failed to authenticate: {str(e)}")
             self.status_message = "Connection failed"
             self.status_color = 8
+
+    def connect_current_fields(self, ctx=None):
+        account = self.m_account.value.strip()
+        password = self.m_pass.value
+        if not account or not password:
+            raise ValueError("Please enter account name and password")
+
+        server = self.m_server.value.strip()
+        api_port = int(self.m_api_port.value.strip())
+        self.auth_client.base_url = server
+        self.auth_client.auth_endpoint = f"{server}/api/auth/login"
+        result = self.auth_client.login(account, password)
+        self.status_message = f"Connected as {result.accountName}"
+        self.status_color = 11
+
+        if ctx is not None and result.playerCharacterList:
+            ctx.set_character_list(result.playerCharacterList)
+
+        if self.on_connect_callback:
+            connection_info = {
+                "auth_data": result,
+                "server_url": server,
+                "api_port": api_port,
+                "telnet_host": self.m_tn_host.value.strip(),
+                "telnet_port": int(self.m_tn_port.value.strip())
+            }
+            print(f"Before calling callback: {connection_info}")
+            self.on_connect_callback(connection_info)
+            print(f"After calling callback: {connection_info}")
+
+        return result
+
+    def connect_saved_connection(self, name: str, ctx=None):
+        target = str(name or "").strip().lower()
+        if not target:
+            raise ValueError("Usage: connect <connection-name>")
+
+        self._load_connections()
+        for idx, conn in enumerate(self.saved_connections):
+            conn_name = str(conn.get("name", "")).strip()
+            if conn_name.lower() == target:
+                self._load_connection(idx)
+                return self.connect_current_fields(ctx=ctx)
+
+        raise ValueError(f"Connection '{name}' not found")
 
     def update(self, ctx) -> None:
         if not self.visible:
